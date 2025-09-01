@@ -38,7 +38,7 @@ public class controller {
         ObjectMapper mapper=new ObjectMapper();
         System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
 
-        return messageService.sendRegRequest(request);
+        return messageService.sendMessaage(request);
     }
 
     @PostMapping("/optin")
