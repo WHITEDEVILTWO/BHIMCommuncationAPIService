@@ -1,5 +1,6 @@
 package org.npci.bhim.BHIMSMSserviceAPI.model;
 
+import jakarta.annotation.Nullable;
 import lombok.Data;
 import lombok.NonNull;
 
@@ -11,7 +12,9 @@ public class TextMsgRequest {
     private String to;
     @NonNull
     private String type;
-    @NonNull
+    @Nullable
+    private Template template;
+    @Nullable
     private Text text;
     private Metadata metadata;
 
