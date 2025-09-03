@@ -1,8 +1,8 @@
 package org.npci.bhim.BHIMSMSserviceAPI.service;
 
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.npci.bhim.BHIMSMSserviceAPI.convAPIConstants.ConvAPIConstants;
-import org.npci.bhim.BHIMSMSserviceAPI.model.TextMsgRequest;
+import org.npci.bhim.BHIMSMSserviceAPI.modelRCS.RCSTextMessageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -15,18 +15,19 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
-public class MessageService {
-
+@Slf4j
+public class MessageServiceRCS {
     @Autowired
     private WebClient webClient;
+
     @Autowired
     private RedisService redisService;
 
-    public Mono<Map<String, Object>> sendMessaage(TextMsgRequest request) {
+    public Mono<Map<String, Object>> sendMessaage(RCSTextMessageRequest request) {
         String token= redisService.get("access_token").block().toString();
+        String URL_RCS=String.format("https://convapi.aclwhatsapp.com/v1/projects/e3fe594a-90d9-4387-9848-b1ceca763d87/messages:send");
         return webClient.post()
-                .uri("https://api.aclwhatsapp.com/pull-platform-receiver/v2/wa/messages")
+                .uri(URL_RCS)
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION,"Bearer "+token)
@@ -48,7 +49,6 @@ public class MessageService {
                     // If response is JSON, parse it into Map
                     if (status.is2xxSuccessful() && MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
                         return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-//                                .flatMap()
                                 .doOnNext(body -> System.out.println("Response Body: " + body));
                     } else {
                         // Otherwise, read it as plain String and log for debugging

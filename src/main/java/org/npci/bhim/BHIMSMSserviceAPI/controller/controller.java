@@ -10,6 +10,7 @@ import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
 import org.npci.bhim.BHIMSMSserviceAPI.model.TextMsgRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.service.AuthenticateService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.MessageService;
+import org.npci.bhim.BHIMSMSserviceAPI.service.RedisService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,10 +37,15 @@ public class controller {
     @Autowired
     private MessageService messageService;
 
+    @Autowired
+    private RedisService redisService;
+
     @PostMapping("/getToken")
     public Mono<ResponseEntity<Map<String,Object>>> getToken(@ModelAttribute Registration request) throws JsonProcessingException {
         ObjectMapper mapper=new ObjectMapper();
         System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
+        Object accessToken = redisService.get("access_token").block();
+        log.info("Access Token from controller : {} ",accessToken);
         return authenticateService.sendRegRequest(request);
     }
     @PostMapping("/sendmessage")
