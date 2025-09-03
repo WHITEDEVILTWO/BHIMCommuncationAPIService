@@ -4,19 +4,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.MediaUploadRequest;
-import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.WaTextMsgRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Consent;
 import org.npci.bhim.BHIMSMSserviceAPI.model.GetConsentData;
-import org.npci.bhim.BHIMSMSserviceAPI.model.MediaUpload;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
+import org.npci.bhim.BHIMSMSserviceAPI.model.TextMsgRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.service.AuthenticateService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.MessageService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.RedisService;
-import org.npci.bhim.BHIMSMSserviceAPI.utils.MediaUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
@@ -25,7 +21,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/whatsapp")
 @Slf4j
-@EnableAsync
 public class controller {
 
     @Autowired
@@ -48,18 +43,18 @@ public class controller {
     @PostMapping("/getToken")
     public Mono<ResponseEntity<Map<String,Object>>> getToken(@ModelAttribute Registration request) throws JsonProcessingException {
         ObjectMapper mapper=new ObjectMapper();
-//        System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
-//        Object accessToken = redisService.get("WA_access_token").block();
-//        log.info("Access Token from controller : {} ",accessToken);
+        System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
+        Object accessToken = redisService.get("access_token").block();
+        log.info("Access Token from controller : {} ",accessToken);
         return authenticateService.sendRegRequest(request);
     }
     @PostMapping("/sendmessage")
-    public Mono<Map<String, Object>> sedMessage(@RequestBody WaTextMsgRequest request) throws JsonProcessingException {
+    public Mono<Map<String, Object>> sedMessage(@RequestBody TextMsgRequest request) throws JsonProcessingException {
 
         ObjectMapper mapper=new ObjectMapper();
         System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
 
-        return messageService.sendMessage(request);
+        return messageService.sendMessaage(request);
     }
 
     @PostMapping("/optin")
@@ -91,22 +86,6 @@ public class controller {
 //        LocalDate to = LocalDate.parse(request.getToDate());
 
         return authenticateService.getConsent(request);
-    }
-
-    @PostMapping("/uploadMedia")
-    public Mono<Map<String, Object>> uploadMedia(@RequestBody MediaUpload request) throws JsonProcessingException {
-
-        ObjectMapper mapper=new ObjectMapper();
-        log.info(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
-//        LocalDate from = LocalDate.parse(request.getFromDate());
-//        LocalDate to = LocalDate.parse(request.getToDate());
-        String mediaFormat = MediaUtils.getMediaFormatFromUrl(request.getMediaUrl());
-
-        MediaUploadRequest requestDTO = new MediaUploadRequest();
-        requestDTO.setMediaUrl(request.getMediaUrl());
-        requestDTO.setMediaFormat(mediaFormat);
-
-        return messageService.sendMediaRequest(requestDTO);
     }
 
 
