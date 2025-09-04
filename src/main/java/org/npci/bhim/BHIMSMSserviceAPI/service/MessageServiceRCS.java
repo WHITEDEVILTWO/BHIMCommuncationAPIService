@@ -1,9 +1,8 @@
 package org.npci.bhim.BHIMSMSserviceAPI.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.npci.bhim.BHIMSMSserviceAPI.convAPIConstants.ConvAPIConstants;
 import org.npci.bhim.BHIMSMSserviceAPI.modelRCS.RCSTextMessageRequest;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -16,15 +15,20 @@ import java.util.Map;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class MessageServiceRCS {
-    @Autowired
-    private WebClient webClient;
 
-    @Autowired
-    private RedisService redisService;
+    private final WebClient webClient;
+    private final RedisService redisService;
+
+    private final TokenManager tokenManager;
 
     public Mono<Map<String, Object>> sendMessaage(RCSTextMessageRequest request) {
-        String token= redisService.get("access_token").block().toString();
+        String token= redisService.get("RCS_access_token").block().toString();
+        if(token == null){
+            tokenManager.getToken();
+            token= redisService.get("RCS_refesh_token").block().toString();
+        }
         String URL_RCS=String.format("https://convapi.aclwhatsapp.com/v1/projects/e3fe594a-90d9-4387-9848-b1ceca763d87/messages:send");
         return webClient.post()
                 .uri(URL_RCS)

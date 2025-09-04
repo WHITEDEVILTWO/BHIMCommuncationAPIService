@@ -13,6 +13,7 @@ import org.npci.bhim.BHIMSMSserviceAPI.service.MessageService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.RedisService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
@@ -21,6 +22,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/whatsapp")
 @Slf4j
+@EnableAsync
 public class controller {
 
     @Autowired
@@ -43,9 +45,9 @@ public class controller {
     @PostMapping("/getToken")
     public Mono<ResponseEntity<Map<String,Object>>> getToken(@ModelAttribute Registration request) throws JsonProcessingException {
         ObjectMapper mapper=new ObjectMapper();
-        System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
-        Object accessToken = redisService.get("access_token").block();
-        log.info("Access Token from controller : {} ",accessToken);
+//        System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
+//        Object accessToken = redisService.get("WA_access_token").block();
+//        log.info("Access Token from controller : {} ",accessToken);
         return authenticateService.sendRegRequest(request);
     }
     @PostMapping("/sendmessage")

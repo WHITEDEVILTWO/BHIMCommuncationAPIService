@@ -5,11 +5,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.npci.bhim.BHIMSMSserviceAPI.convAPIConstants.ConvAPIConstants;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Consent;
 import org.npci.bhim.BHIMSMSserviceAPI.model.GetConsentData;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -23,18 +22,21 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Primary
 public class AuthenticateService {
-    @Autowired
-    private WebClient webClient;
-    @Autowired
-    private RedisService redisService;
+
+    private final WebClient webClient;
+
+    private final  RedisService redisService;
+
+
+    private final TokenManager tokenManager;
 
     public Mono<ResponseEntity<Map<String, Object>>> sendRegRequest(Registration request) {
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
@@ -44,7 +46,7 @@ public class AuthenticateService {
         formData.add("password", request.getPassword());
 
         final String PROD_URL = String.format("https://auth.aclwhatsapp.com/realms/ipmessaging/protocol/openid-connect/token");
-        final String UAT_URL = String.format("https://apiuat.aclwhatsapp.com/auth/realms/ipmessaging/protocol/openid-connect/token");
+//        final String UAT_URL = String.format("https://apiuat.aclwhatsapp.com/auth/realms/ipmessaging/protocol/openid-connect/token");
         Mono<ResponseEntity<Map<String, Object>>> reponsebody = webClient.post()
                 .uri(PROD_URL)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -64,14 +66,22 @@ public class AuthenticateService {
                                 log.info("Access token is : {}",accessToken);
                                 String refreshToken = (String) body.get("refresh_token");
                                 Integer expiresIn = (Integer) body.get("expires_in");
+                                Integer refresh_expires_in=(Integer) body.get("refresh_expires_in");
 
-                                if (accessToken != null && expiresIn != null) {
+                                if (accessToken != null &&formData.toSingleValueMap().containsValue("npcibhimpd") && expiresIn != null ) {
                                     // ✅ Store in Redis with TTL
                                     return redisService
-                                            .save("access_token", accessToken, Duration.ofSeconds(expiresIn))
+                                            .save("WA_access_token", accessToken, Duration.ofSeconds(expiresIn))
+                                            .and(redisService.save("WA_refresh_token", refreshToken, Duration.ofSeconds(refresh_expires_in)))
                                             .doOnNext(success -> log.info("Token cached: {}", success))
                                             .thenReturn(ResponseEntity.status(clientResponse.statusCode()).body(body));
-                                } else {
+                                }else if(accessToken != null &&formData.toSingleValueMap().containsValue("bhimapp_promo") &&expiresIn != null ){
+                                    return redisService
+                                            .save("RCS_access_token", accessToken, Duration.ofSeconds(expiresIn))
+                                            .and(redisService.save("RCS_refresh_token", refreshToken, Duration.ofSeconds(refresh_expires_in)))
+                                            .doOnNext(success -> log.info("Token cached: {}", success))
+                                            .thenReturn(ResponseEntity.status(clientResponse.statusCode()).body(body));
+                                }else {
                                     return Mono.just(ResponseEntity.status(clientResponse.statusCode()).body(body));
                                 }
                             });
@@ -99,13 +109,13 @@ public class AuthenticateService {
 //                });
 //    }
     public Mono<Map<String, Object>> optInRequest(Consent request) {
-        String token= redisService.get("access_token").block().toString();
+        String token= redisService.get("WA_access_token").block().toString();
         if(token == null){
-            // regenerateToken() async
-             token= redisService.get("refesh_token").block().toString();
+            tokenManager.getToken();
+            token= redisService.get("WA_refesh_token").block().toString();
         }
         final String PROD_URL = String.format("https://optin.aclwhatsapp.com/api/v1/optin/bulk");
-        final String UAT_URL = String.format("https://pushuat.aclwhatsapp.com/api/v1/wa/optin/bulk");
+//        final String UAT_URL = String.format("https://pushuat.aclwhatsapp.com/api/v1/wa/optin/bulk");
         return webClient.post()
                 .uri(PROD_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -135,9 +145,13 @@ public class AuthenticateService {
     }
 
     public Mono<Map<String, Object>> optOutRequest(Consent request) {
-        String token= redisService.get("access_token").block().toString();
+        String token= redisService.get("WA_access_token").block().toString();
+        if(token == null){
+            tokenManager.getToken();
+            token= redisService.get("WA_refesh_token").block().toString();
+        }
         final String PROD_URL = String.format("https://optin.aclwhatsapp.com/api/v1/optout/bulk");
-        final String UAT_URL = String.format("https://pushuat.aclwhatsapp.com/api/v1/wa/optout/bulk");
+//        final String UAT_URL = String.format("https://pushuat.aclwhatsapp.com/api/v1/wa/optout/bulk");
         return webClient.post()
                 .uri(PROD_URL)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -167,7 +181,11 @@ public class AuthenticateService {
     }
 
     public Mono<byte[]> getConsent(GetConsentData request) {
-        String token = "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICIxNGhacWFGd1hZalRoXzh5Q0lFZGJ4NFo2eXFMOXBnTngtZTZydS1HRmtvIn0.eyJleHAiOjE3NTY3OTI4ODYsImlhdCI6MTc1NjcwNjQ4NiwianRpIjoiMTA2N2Q1MzctMTZhYy00NjIxLTk2MmMtNTM3NzVmMjVjNGViIiwiaXNzIjoiaHR0cHM6Ly9hdXRoLmFjbHdoYXRzYXBwLmNvbS9yZWFsbXMvaXBtZXNzYWdpbmciLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiY2E2YzM5ZWEtNGY0OS00NjEzLTg2ZmItNWI3Nzk3ZjU3ODk0IiwidHlwIjoiQmVhcmVyIiwiYXpwIjoiaXBtZXNzYWdpbmctY2xpZW50Iiwic2Vzc2lvbl9zdGF0ZSI6ImYxY2U0ZDQ5LTU0YjAtNDAxZS04ZDg3LTBmZjQyYTBlZTFhZSIsImFjciI6IjEiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsiZGVmYXVsdC1yb2xlcy1jb252ZXJzYXRpb25hbC1yZWFsbSIsIm9mZmxpbmVfYWNjZXNzIiwidW1hX2F1dGhvcml6YXRpb24iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6ImVtYWlsIHByb2ZpbGUgc2VuZGVyIGFwcElkIiwic2lkIjoiZjFjZTRkNDktNTRiMC00MDFlLThkODctMGZmNDJhMGVlMWFlIiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJzZW5kZXIiOiI5MTgyOTExMTkxOTEiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJucGNpYmhpbXBkIn0.mL2bYixFY8hRN1Z7rDtWv5m0doYodgoN0PCm_2Yx3v0p3ePMFqzIpldWAyJb6pNkg37L5BCiZ2qJ-inA0HuSAl3G0ltKkuTdPddFKm-0HU1gf2R-PGmGrCNo222mDFNcr0ujaeyW04lseY_5CM_fNQQYRNoHCYN0tSBzgP0VuMbuwN3hL2cHeJN5EJ2RDCFI3dtulGFMKeFHNBElwInSFQIu1L5ugeJTV3JJuiueNR02mM6WPpCLKJdWjnItiIrHZtMwu9eIidUXl_Avg3VDccHykIY79G2FGQeswyduDZIi0p2UWVtZIiPSW2nZueXjZGUPvolJNoPDAp_jQsyAJA";
+        String token= redisService.get("WA_access_token").block().toString();
+        if(token == null){
+            tokenManager.getToken();
+            token= redisService.get("WA_refesh_token").block().toString();
+        }
         String url = String.format("https://smartta.aclwhatsapp.com/optindata/v1/" + request.getFromDate().toString() + "/" + request.getToDate().toString());
         System.out.println(url);
 //        return webClient.get()

@@ -1,9 +1,8 @@
 package org.npci.bhim.BHIMSMSserviceAPI.service;
 
 import lombok.RequiredArgsConstructor;
-import org.npci.bhim.BHIMSMSserviceAPI.convAPIConstants.ConvAPIConstants;
+import lombok.extern.slf4j.Slf4j;
 import org.npci.bhim.BHIMSMSserviceAPI.model.TextMsgRequest;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -16,15 +15,20 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MessageService {
 
-    @Autowired
-    private WebClient webClient;
-    @Autowired
-    private RedisService redisService;
+    private final WebClient webClient;
+    private final RedisService redisService;
+
+    private final TokenManager tokenManager;
 
     public Mono<Map<String, Object>> sendMessaage(TextMsgRequest request) {
-        String token= redisService.get("access_token").block().toString();
+        String token= redisService.get("WA_access_token").block().toString();
+        if(token == null){
+            tokenManager.getToken();
+            token= redisService.get("WA_refesh_token").block().toString();
+        }
         return webClient.post()
                 .uri("https://api.aclwhatsapp.com/pull-platform-receiver/v2/wa/messages")
                 .contentType(MediaType.APPLICATION_JSON)
