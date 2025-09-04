@@ -33,3 +33,60 @@ https://web.postman.co/workspace/My-Workspace~4e79c9a5-29ea-45d7-8b45-d5789494cf
 https://.postman.co/workspace/My-Workspace~4e79c9a5-29ea-45d7-8b45-d5789494cf6a/folder/40380338-e5b2bb9f-571f-4799-89f6-5ed59d60f60c?action=share&creator=40380338&ctx=documentation
 
 https://.postman.co/workspace/My-Workspace~4e79c9a5-29ea-45d7-8b45-d5789494cf6a/collection/40380338-cf8edc35-d188-4e33-8040-4585f1e97813?action=share&creator=40380338
+
+------------------------------------------------------------------------------------
+
+RCS TEMPLATE OBJECT:
+
+{
+    "app_id": "01H0MFFJFX0YAWYA5XG4D3MRTA",
+    "recipient": {
+        "identified_by": {
+            "channel_identities": [
+                {
+                    "channel": "RCS",
+                    "identity": "919876543210"
+                }
+            ]
+        }
+    },
+    "message": {
+        "template_message": {
+            "channel_template": {
+                "RCS": {
+                    "template_id": "test_rcs_template",
+                    "language_code": "en",
+                    "parameters": {
+                        "cust_name": "Rajesh",
+                        "amount": "Rs. 5,000",
+                        "discount": "30%"
+                    }
+                }
+            }
+        }
+    }
+}
+---------------------------------------------------------------------
+WA STATIC TEMPLATE OBJECT:
+
+{
+  "recipient_type" : "individual",
+  "to" : "917893411160",
+  "type" : "template",
+  "template" : {
+    "name" : "p2p_cohort_19082025",
+    "language" : {
+      "policy" : "deterministic",
+      "code" : "en"
+    },
+    "components" : null
+  },
+  "metadata" : {
+    "messageId" : "8d3fe6f3-21fc-4130-9c29-5a7be3799340",
+    "transactionId" : "a5da78ac-01b5-4fec-b3eb-0e1402f8f577",
+    "callbackDlrUrl" : "https://bhimupi.com"
+  }
+}
+HTTP Status code: 200
+Response Body: {success=true, responseId=56844583401309270784}
+----------------------------------------------------
