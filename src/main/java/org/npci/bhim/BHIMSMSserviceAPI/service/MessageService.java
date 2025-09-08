@@ -101,7 +101,7 @@ public class MessageService {
 //                ;
 //    }
     @Transactional
-    public MediaUploadResponse sendMediaRequest(String mediaUrl) {
+    public MediaUploadResponse sendMediaRequest(MediaUploadRequest requestDTO) {
 
         String token = redisService.get("WA_access_token").block().toString();
         if (token == null) {
@@ -109,11 +109,7 @@ public class MessageService {
             token = redisService.get("WA_refesh_token").block().toString();
         }
         // Step 1: Auto-generate format
-        String mediaFormat = MediaUtils.getMediaFormatFromUrl(mediaUrl);
 
-        MediaUploadRequest requestDTO = new MediaUploadRequest();
-        requestDTO.setMediaUrl(mediaUrl);
-        requestDTO.setMediaFormat(mediaFormat);
 
 
         String URL = String.format("https://api.aclwhatsapp.com/access-api/api/v1/wa/{}/media/upload", ConvAPIConstants.WATempltes.WBAID);
@@ -129,7 +125,7 @@ public class MessageService {
 
         if (responseDTO != null && responseDTO.getAcknowledgementId() != null) {
             // Step 3: Save in Redis
-            redisService.save(responseDTO.getAcknowledgementId(), mediaUrl);
+            redisService.save(responseDTO.getAcknowledgementId(), requestDTO.getMediaUrl());
 
             // Step 4: Save in YugabyteDB
             MediaResponseEntity entity=new MediaResponseEntity();

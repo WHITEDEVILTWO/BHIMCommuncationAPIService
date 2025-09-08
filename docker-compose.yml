@@ -17,7 +17,7 @@ services:
       dockerfile: Dockerfile # Name of your Spring Boot Dockerfile
     container_name: springboot-app
     ports:
-      - "8080:8080" # Or your application's port
+      - "9098:9098" # Or your application's port
     environment:
       # Database connection properties for Spring Boot
       SPRING_DATASOURCE_URL: jdbc:postgresql://yugabytedb:5433/yugabyte # Use service name 'yugabytedb'
