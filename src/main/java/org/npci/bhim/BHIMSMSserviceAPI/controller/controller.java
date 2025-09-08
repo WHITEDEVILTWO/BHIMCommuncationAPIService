@@ -7,7 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Consent;
 import org.npci.bhim.BHIMSMSserviceAPI.model.GetConsentData;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
-import org.npci.bhim.BHIMSMSserviceAPI.model.TextMsgRequest;
+import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.TextMsgRequest;
+import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.MediaUploadResponse;
 import org.npci.bhim.BHIMSMSserviceAPI.service.AuthenticateService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.MessageService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.RedisService;
@@ -56,7 +57,7 @@ public class controller {
         ObjectMapper mapper=new ObjectMapper();
         System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
 
-        return messageService.sendMessaage(request);
+        return messageService.sendMessage(request);
     }
 
     @PostMapping("/optin")
@@ -88,6 +89,17 @@ public class controller {
 //        LocalDate to = LocalDate.parse(request.getToDate());
 
         return authenticateService.getConsent(request);
+    }
+
+    @GetMapping("/uploadMedia")
+    public MediaUploadResponse uploadMedia(@RequestParam String mediaUrl) throws JsonProcessingException {
+
+        ObjectMapper mapper=new ObjectMapper();
+        log.info(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(mediaUrl));
+//        LocalDate from = LocalDate.parse(request.getFromDate());
+//        LocalDate to = LocalDate.parse(request.getToDate());
+
+        return messageService.sendMediaRequest(mediaUrl);
     }
 
 

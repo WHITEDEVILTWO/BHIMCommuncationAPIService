@@ -17,6 +17,9 @@ public class RedisService {
     public Mono<Boolean> save(String key, Object value, Duration ttl) {
         return redisTemplate.opsForValue().set(key, value, ttl);
     }
+    public Mono<Boolean> save(String key, Object value) {
+        return redisTemplate.opsForValue().set(key, value);
+    }
 
     public Mono<Object> get(String key) {
         return redisTemplate.opsForValue().get(key);
