@@ -1,10 +1,11 @@
-package org.npci.bhim.BHIMSMSserviceAPI.modelRCS;
+package org.npci.bhim.BHIMSMSserviceAPI.rcsMessageRequests;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import org.npci.bhim.BHIMSMSserviceAPI.convAPIConstants.ConvAPIConstants;
+import org.npci.bhim.BHIMSMSserviceAPI.modelRCS.IdentifiedBy;
+import org.npci.bhim.BHIMSMSserviceAPI.modelRCS.Message;
 
 @Data
 @NoArgsConstructor

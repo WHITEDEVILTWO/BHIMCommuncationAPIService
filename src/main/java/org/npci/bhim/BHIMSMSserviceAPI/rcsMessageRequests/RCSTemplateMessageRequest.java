@@ -1,0 +1,21 @@
+package org.npci.bhim.BHIMSMSserviceAPI.rcsMessageRequests;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
+import org.npci.bhim.BHIMSMSserviceAPI.convAPIConstants.ConvAPIConstants;
+import org.npci.bhim.BHIMSMSserviceAPI.modelRCS.IdentifiedBy;
+import org.npci.bhim.BHIMSMSserviceAPI.modelRCS.Message;
+
+@Data
+@NoArgsConstructor
+@JsonInclude(value = JsonInclude.Include.NON_NULL)
+public class RCSTemplateMessageRequest {
+    @NonNull
+    private String app_id= ConvAPIConstants.Conv_app_id;
+    @NonNull
+    private IdentifiedBy recipient;
+    @NonNull
+    private Message message;
+}
