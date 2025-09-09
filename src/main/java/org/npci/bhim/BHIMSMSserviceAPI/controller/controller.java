@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.MediaUploadRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Consent;
 import org.npci.bhim.BHIMSMSserviceAPI.model.GetConsentData;
+import org.npci.bhim.BHIMSMSserviceAPI.model.MediaUpload;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.TextMsgRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.MediaUploadResponse;
@@ -94,16 +95,16 @@ public class controller {
     }
 
     @PostMapping("/uploadMedia")
-    public MediaUploadResponse uploadMedia(@RequestParam String mediaUrl) throws JsonProcessingException {
+    public MediaUploadResponse uploadMedia(@RequestBody MediaUpload request) throws JsonProcessingException {
 
         ObjectMapper mapper=new ObjectMapper();
-        log.info(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(mediaUrl));
+        log.info(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
 //        LocalDate from = LocalDate.parse(request.getFromDate());
 //        LocalDate to = LocalDate.parse(request.getToDate());
-        String mediaFormat = MediaUtils.getMediaFormatFromUrl(mediaUrl);
+        String mediaFormat = MediaUtils.getMediaFormatFromUrl(request.getMediaUrl());
 
         MediaUploadRequest requestDTO = new MediaUploadRequest();
-        requestDTO.setMediaUrl(mediaUrl);
+        requestDTO.setMediaUrl(request.getMediaUrl());
         requestDTO.setMediaFormat(mediaFormat);
 
         return messageService.sendMediaRequest(requestDTO);

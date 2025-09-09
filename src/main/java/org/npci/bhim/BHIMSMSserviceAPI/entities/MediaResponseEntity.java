@@ -1,16 +1,17 @@
 package org.npci.bhim.BHIMSMSserviceAPI.entities;
 
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+//import jakarta.persistence.Entity;
+//import jakarta.persistence.Id;
+//import jakarta.persistence.Table;
 import lombok.Data;
+import org.springframework.data.annotation.Id;
 
-@Entity
-@Table (name="media_responses")
+//@Entity
+//@Table (name="media_responses")
 @Data
 public class MediaResponseEntity {
-    @Id
+//    @Id
     private String acknowledgementId;
     private String mediaUrl;
 }

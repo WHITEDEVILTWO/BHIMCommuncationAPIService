@@ -30,7 +30,7 @@ public class MessageService {
 
     private final TokenManager tokenManager;
 
-    private final MediaResponseRepository mediaResponseRepository;
+//    private final MediaResponseRepository mediaResponseRepository;
 
     public Mono<Map<String, Object>> sendMessage(TextMsgRequest request) {
         String token = redisService.get("WA_access_token").block().toString();
@@ -103,21 +103,22 @@ public class MessageService {
     @Transactional
     public MediaUploadResponse sendMediaRequest(MediaUploadRequest requestDTO) {
 
-        String token = redisService.get("WA_access_token").block().toString();
+        Object token = redisService.get("WA_access_token").block();
         if (token == null) {
             tokenManager.getToken();
-            token = redisService.get("WA_refesh_token").block().toString();
+          token = redisService.get("WA_refesh_token").block();
         }
         // Step 1: Auto-generate format
 
 
 
-        String URL = String.format("https://api.aclwhatsapp.com/access-api/api/v1/wa/{}/media/upload", ConvAPIConstants.WATempltes.WBAID);
+        String URL = String.format("https://api.aclwhatsapp.com/access-api/api/v1/wa/%s/media/upload", ConvAPIConstants.WATempltes.WBAID);
         log.info(URL);
         // Step 2: Call 3rd party API
         MediaUploadResponse responseDTO = webClient.post()
                 .uri(URL)
                 .contentType(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION,"Bearer "+token)
                 .bodyValue(requestDTO)
                 .retrieve()
                 .bodyToMono(MediaUploadResponse.class)
@@ -132,7 +133,7 @@ public class MessageService {
             entity.setAcknowledgementId(responseDTO.getAcknowledgementId());
             entity.setMediaUrl(requestDTO.getMediaUrl());
 
-            mediaResponseRepository.save(entity);
+//            mediaResponseRepository.save(entity);
 
         }
 
