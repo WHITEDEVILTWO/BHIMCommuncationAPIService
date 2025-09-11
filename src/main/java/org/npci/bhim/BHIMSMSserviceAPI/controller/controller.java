@@ -4,14 +4,16 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.MediaUploadRequest;
+import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.WaTextMsgRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Consent;
 import org.npci.bhim.BHIMSMSserviceAPI.model.GetConsentData;
+import org.npci.bhim.BHIMSMSserviceAPI.model.MediaUpload;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
-import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.TextMsgRequest;
-import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.MediaUploadResponse;
 import org.npci.bhim.BHIMSMSserviceAPI.service.AuthenticateService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.MessageService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.RedisService;
+import org.npci.bhim.BHIMSMSserviceAPI.utils.MediaUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -52,7 +54,7 @@ public class controller {
         return authenticateService.sendRegRequest(request);
     }
     @PostMapping("/sendmessage")
-    public Mono<Map<String, Object>> sedMessage(@RequestBody TextMsgRequest request) throws JsonProcessingException {
+    public Mono<Map<String, Object>> sedMessage(@RequestBody WaTextMsgRequest request) throws JsonProcessingException {
 
         ObjectMapper mapper=new ObjectMapper();
         System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
@@ -91,15 +93,20 @@ public class controller {
         return authenticateService.getConsent(request);
     }
 
-    @GetMapping("/uploadMedia")
-    public MediaUploadResponse uploadMedia(@RequestParam String mediaUrl) throws JsonProcessingException {
+    @PostMapping("/uploadMedia")
+    public Mono<Map<String, Object>> uploadMedia(@RequestBody MediaUpload request) throws JsonProcessingException {
 
         ObjectMapper mapper=new ObjectMapper();
-        log.info(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(mediaUrl));
+        log.info(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
 //        LocalDate from = LocalDate.parse(request.getFromDate());
 //        LocalDate to = LocalDate.parse(request.getToDate());
+        String mediaFormat = MediaUtils.getMediaFormatFromUrl(request.getMediaUrl());
 
-        return messageService.sendMediaRequest(mediaUrl);
+        MediaUploadRequest requestDTO = new MediaUploadRequest();
+        requestDTO.setMediaUrl(request.getMediaUrl());
+        requestDTO.setMediaFormat(mediaFormat);
+
+        return messageService.sendMediaRequest(requestDTO);
     }
 
 

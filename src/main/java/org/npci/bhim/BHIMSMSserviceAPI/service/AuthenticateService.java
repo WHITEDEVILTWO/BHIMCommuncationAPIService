@@ -70,8 +70,7 @@ public class AuthenticateService {
 
                                 if (accessToken != null &&formData.toSingleValueMap().containsValue("npcibhimpd") && expiresIn != null ) {
                                     // ✅ Store in Redis with TTL
-                                    return redisService
-                                            .save("WA_access_token", accessToken, Duration.ofSeconds(expiresIn))
+                                    return redisService.save("WA_access_token", accessToken, Duration.ofSeconds(expiresIn))
                                             .and(redisService.save("WA_refresh_token", refreshToken, Duration.ofSeconds(refresh_expires_in)))
                                             .doOnNext(success -> log.info("Token cached: {}", success))
                                             .thenReturn(ResponseEntity.status(clientResponse.statusCode()).body(body));

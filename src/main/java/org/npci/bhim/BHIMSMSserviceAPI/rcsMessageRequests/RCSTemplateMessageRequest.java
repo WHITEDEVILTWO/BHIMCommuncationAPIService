@@ -12,7 +12,6 @@ import org.npci.bhim.BHIMSMSserviceAPI.modelRCS.Message;
 @NoArgsConstructor
 @JsonInclude(value = JsonInclude.Include.NON_NULL)
 public class RCSTemplateMessageRequest {
-    @NonNull
     private String app_id= ConvAPIConstants.Conv_app_id;
     @NonNull
     private IdentifiedBy recipient;

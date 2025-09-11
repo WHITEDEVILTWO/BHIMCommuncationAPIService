@@ -23,6 +23,7 @@ public class RedisConfiguration {
     @Bean
     @Primary
     public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory() {
+
         return new LettuceConnectionFactory();
     }
 

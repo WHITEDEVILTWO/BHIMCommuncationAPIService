@@ -1,20 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true" scanPeriod="3 seconds">
     <appender name="API_Request_Logger" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>./log/API_Request_Logger</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>logs/APIRequests.%d{yyyy-MM--dd}.log.gz</fileNamePattern>
+        <file>./log/API_Request_Logger.log</file>
+
+        <!-- Size + Time based rolling policy -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- Daily rollover + size limit -->
+            <fileNamePattern>./log/APIRequests.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>1GB</maxFileSize>
             <maxHistory>30</maxHistory>
+            <totalSizeCap>30GB</totalSizeCap> <!-- optional, limits total log size -->
         </rollingPolicy>
+
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
+
     <logger name="org.npci.bhim" level="INFO" additivity="false">
-        <appender-ref ref="API_Request_Logger" />
+        <appender-ref ref="API_Request_Logger"/>
     </logger>
 
     <root level="INFO">
-        <appender-ref ref="API_Request_Logger" />
+        <appender-ref ref="API_Request_Logger"/>
     </root>
 </configuration>
