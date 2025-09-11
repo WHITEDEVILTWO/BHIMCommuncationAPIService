@@ -1,14 +1,16 @@
 package org.npci.bhim.BHIMSMSserviceAPI.service;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.npci.bhim.BHIMSMSserviceAPI.convAPIConstants.ConvAPIConstants;
 import org.npci.bhim.BHIMSMSserviceAPI.entities.MediaResponseEntity;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.MediaUploadRequest;
-import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.TextMsgRequest;
-import org.npci.bhim.BHIMSMSserviceAPI.repos.MediaResponseRepository;
+import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.WaTextMsgRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.MediaUploadResponse;
-import org.npci.bhim.BHIMSMSserviceAPI.utils.MediaUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.Map;
 
 @Service
@@ -30,14 +33,33 @@ public class MessageService {
 
     private final TokenManager tokenManager;
 
+    @Value("${npci.wa.uname}")
+    String keyId;
+    @Value("${npci.wa.key}")
+    String key;
+
 //    private final MediaResponseRepository mediaResponseRepository;
 
-    public Mono<Map<String, Object>> sendMessage(TextMsgRequest request) {
-        String token = redisService.get("WA_access_token").block().toString();
-        if (token == null) {
-            tokenManager.getToken();
-            token = redisService.get("WA_refesh_token").block().toString();
-        }
+    public Mono<Map<String, Object>> sendMessage(WaTextMsgRequest request) throws JsonProcessingException {
+//        log.info("Rcs Template Message Request------>\n,{}",request);
+        ObjectMapper mapper=new ObjectMapper();
+        mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
+        String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+//        log.info("Outgoing RCS Template Message Request----> \n: {}",json);
+        return tokenManager.getValidToken(keyId, key)
+                .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
+                .onErrorResume(ex -> {
+                    // If token expired (403), regenerate and retry once
+                    if (ex.getMessage()!=null && ex.getMessage().contains("403")) {
+                        log.warn("!Access token might be expired or not authorized, regenerating and retrying...");
+                        return tokenManager.regenerateAccessToken(keyId, key)
+                                .flatMap(newToken -> sendMessageWithToken(request, newToken));
+                    }
+                    return Mono.error(ex); // propagate other errors
+                });
+    }
+    public Mono<Map<String, Object>> sendMessageWithToken(WaTextMsgRequest request,String token) {
+
         return webClient.post()
                 .uri("https://api.aclwhatsapp.com/pull-platform-receiver/v2/wa/messages")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -62,8 +84,24 @@ public class MessageService {
                     if (status.is2xxSuccessful() && MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
                         return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
                                 })
-//                                .flatMap()
-                                .doOnNext(body -> System.out.println("Response Body: " + body));
+                                .doOnNext(body->
+                                        log.info("✅ Message sent successfully. Status: {}, Response: {}", status.value(), body))
+                                .doOnNext(body-> {
+                                    ObjectMapper mapper=new ObjectMapper();
+                                    mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+                                    try {
+                                        String  json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+                                        String responseId = (String) body.get("responseId");
+                                        log.info("ResponseId: {}",responseId);
+                                        log.info("Saving response and body to redis\n: {}",request);
+                                        redisService.save(responseId, request)
+                                                .doOnNext(saved -> log.info("✅ Saved to Redis: {}", saved))
+                                                .doOnError(err -> log.error("❌ Failed to save to Redis", err))
+                                                .subscribe();
+                                    } catch (JsonProcessingException e) {
+                                        throw new RuntimeException("unable to save to redis / json parsing exception. ",e);
+                                    }
+                                });
                     } else {
                         // Otherwise, read it as plain String and log for debugging
                         return clientResponse.bodyToMono(String.class)
@@ -100,44 +138,101 @@ public class MessageService {
     /// /                });
 //                ;
 //    }
+    //-------------------------------------------------------------------------------------------------------
+    public Mono<Map<String, Object>> sendMediaRequest(MediaUploadRequest request) throws JsonProcessingException {
+//        log.info("Rcs Template Message Request------>\n,{}",request);
+        ObjectMapper mapper=new ObjectMapper();
+
+        mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
+
+        String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+
+//        log.info("Outgoing RCS Template Message Request----> \n: {}",json);
+        return tokenManager.getValidToken(keyId, key)
+                .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
+                .onErrorResume(ex -> {
+                    // If token expired (403), regenerate and retry once
+                    if (ex.getMessage()!=null && ex.getMessage().contains("403")) {
+                        log.warn("!Access token might be expired or not authorized, regenerating and retrying...");
+                        return tokenManager.regenerateAccessToken(keyId, key)
+                                .flatMap(newToken -> sendMessageWithToken(request, newToken));
+                    }
+                    return Mono.error(ex); // propagate other errors
+                });
+    }
+
+
     @Transactional
-    public MediaUploadResponse sendMediaRequest(MediaUploadRequest requestDTO) {
+    public Mono<Map<String, Object>> sendMessageWithToken(MediaUploadRequest requestDTO, String token) {
 
-        Object token = redisService.get("WA_access_token").block();
-        if (token == null) {
-            tokenManager.getToken();
-          token = redisService.get("WA_refesh_token").block();
-        }
-        // Step 1: Auto-generate format
+        String URL = String.format("https://api.aclwhatsapp.com/access-api/api/v1/wa/%s/media/upload",
+                ConvAPIConstants.WATempltes.WBAID);
+        log.info("Calling Media Upload API: {}", URL);
 
-
-
-        String URL = String.format("https://api.aclwhatsapp.com/access-api/api/v1/wa/%s/media/upload", ConvAPIConstants.WATempltes.WBAID);
-        log.info(URL);
-        // Step 2: Call 3rd party API
-        MediaUploadResponse responseDTO = webClient.post()
+        return webClient.post()
                 .uri(URL)
                 .contentType(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION,"Bearer "+token)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .bodyValue(requestDTO)
                 .retrieve()
-                .bodyToMono(MediaUploadResponse.class)
-                .block(); // synchronous
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                .flatMap(responseMap -> {
+                    log.info("✅ Media Upload Response: {}", responseMap);
 
-        if (responseDTO != null && responseDTO.getAcknowledgementId() != null) {
-            // Step 3: Save in Redis
-            redisService.save(responseDTO.getAcknowledgementId(), requestDTO.getMediaUrl());
+                    // Extract acknowledgementId from response
+                    String acknowledgementId = (String) responseMap.get("acknowledgementId");
 
-            // Step 4: Save in YugabyteDB
-            MediaResponseEntity entity=new MediaResponseEntity();
-            entity.setAcknowledgementId(responseDTO.getAcknowledgementId());
-            entity.setMediaUrl(requestDTO.getMediaUrl());
+                    if (acknowledgementId != null) {
+                        // Save in Redis (fire & forget)
+                        redisService.save(acknowledgementId, requestDTO.getMediaUrl())
+                                .doOnNext(saved -> log.info("✅ Saved to Redis with ackId={} -> {}", acknowledgementId, requestDTO.getMediaUrl()))
+                                .doOnError(err -> log.error("❌ Failed to save to Redis", err))
+                                .subscribe();
 
-//            mediaResponseRepository.save(entity);
+                        // Save in Yugabyte (fire & forget)
+                        MediaResponseEntity entity = new MediaResponseEntity();
+                        entity.setAcknowledgementId(acknowledgementId);
+                        entity.setMediaUrl(requestDTO.getMediaUrl());
 
-        }
+                        // Uncomment when repo is ready
+                        // Mono.fromRunnable(() -> mediaResponseRepository.save(entity))
+                        //         .subscribe();
+                    }
 
-        return responseDTO;
+                    return Mono.just(responseMap); // ✅ return response JSON
+                });
     }
+
+//    @Transactional
+//    public Mono<Map<String, Object>> sendMessageWithToken(MediaUploadRequest requestDTO,String token) {
+//
+//        // Step 1: Auto-generate format
+//        String URL = String.format("https://api.aclwhatsapp.com/access-api/api/v1/wa/%s/media/upload", ConvAPIConstants.WATempltes.WBAID);
+//        log.info(URL);
+//        // Step 2: Call 3rd party API
+//        MediaUploadResponse responseDTO = webClient.post()
+//                .uri(URL)
+//                .contentType(MediaType.APPLICATION_JSON)
+//                .header(HttpHeaders.AUTHORIZATION,"Bearer "+token)
+//                .bodyValue(requestDTO)
+//                .retrieve()
+//                .bodyToMono(MediaUploadResponse.class)
+//                .block(); // synchronous
+//
+//        if (responseDTO != null && responseDTO.getAcknowledgementId() != null) {
+//            // Step 3: Save in Redis
+//            redisService.save(responseDTO.getAcknowledgementId(), requestDTO.getMediaUrl());
+//
+//            // Step 4: Save in YugabyteDB
+//            MediaResponseEntity entity=new MediaResponseEntity();
+//            entity.setAcknowledgementId(responseDTO.getAcknowledgementId());
+//            entity.setMediaUrl(requestDTO.getMediaUrl());
+//
+////            mediaResponseRepository.save(entity);
+//
+//        }
+//
+//        return;
+//    }
 
 }

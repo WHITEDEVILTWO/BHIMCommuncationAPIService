@@ -5,6 +5,8 @@ import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+
 @Component
 @Slf4j
 public class TokenManager {
@@ -46,30 +48,29 @@ public class TokenManager {
                         Mono.defer(() -> redisService.get("RCS_refresh_token")
                                 .map(Object::toString)
                                 .doOnNext(refresh -> log.info("⚠️ Using refresh token temporarily: {}", refresh))
-                                .switchIfEmpty(
-                                        // Refresh token also not found → regenerate
-                                        regenerateAccessToken(keyId, key)
-                                )
+                                .switchIfEmpty(regenerateAccessToken(keyId, key))
                         )
                 );
     }
 
     /**
-     * Regenerates access token in background and returns a temporary Mono<String>.
+     * Regenerates access token immediately and returns it.
      */
-    private Mono<String> regenerateAccessToken(String keyId, String key) {
+    public Mono<String> regenerateAccessToken(String keyId, String key) {
         Registration request = new Registration();
         request.setUsername(keyId);
         request.setPassword(key);
 
-        // Trigger regeneration in background
-        regenerateTokenService.regenerateToken(request)
-                .doOnNext(resp -> log.info("✅ Access token regenerated in background"))
-                .subscribe(); // Non-blocking fire-and-forget
-
-        // Return empty so that caller can use refresh token temporarily
-        return Mono.empty();
+        // Save regenerated token to Redis before returning
+        return regenerateTokenService.regenerateToken(request)
+                .flatMap(resp -> {
+                    log.info("✅ Access token regenerated immediately: {}", resp);
+                    //returning geerated token
+                    return redisService.get("RCS_access_token").map(Object::toString);
+                })
+                .switchIfEmpty(Mono.error(new RuntimeException("❌ Failed to regenerate access token")));
     }
+
 
 
 

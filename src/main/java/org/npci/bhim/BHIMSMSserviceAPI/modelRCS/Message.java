@@ -11,7 +11,7 @@ public class Message {
 
     @Nullable
     private TextMessage text_message;
-    @Nullable
+
     private Template_Message template_message;
 //    @Nullable
 //    private Buttons choice_message;

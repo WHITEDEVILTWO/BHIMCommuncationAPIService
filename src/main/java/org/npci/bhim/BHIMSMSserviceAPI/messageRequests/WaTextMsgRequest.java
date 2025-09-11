@@ -10,7 +10,7 @@ import org.npci.bhim.BHIMSMSserviceAPI.model.Text;
 
 @Data
 @JsonInclude(value = JsonInclude.Include.NON_NULL)
-public class TextMsgRequest {
+public class WaTextMsgRequest {
     @NonNull
     private String recipient_type;
     @NonNull

@@ -28,7 +28,20 @@ public class RCSController {
     private final AuthenticateService authenticateService;
 
     @PostMapping("/sendRCSTextMessage")
-    public Object sendMessage(@RequestBody RCSTextMessageRequest request) throws JsonProcessingException {
+    public Mono<Map<String,Object>> sendMessage(@RequestBody RCSTextMessageRequest request) throws JsonProcessingException {
+//        log.info("Controller --->Sending RCS text Message to Service........");
+        ObjectMapper mapper=new ObjectMapper();
+
+        mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
+
+        String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+
+//        log.info("Contoller-->Outgoing RCS Text Message Request to service layer----> \n: {}",json);
+        return messageServiceRCS.sendMessage(request);
+
+    }
+    @PostMapping("/sendRCSTemplateMessage")
+    public Mono<Map<String,Object>> sendMessage(@RequestBody RCSTemplateMessageRequest request) throws JsonProcessingException {
 
         ObjectMapper mapper=new ObjectMapper();
 
@@ -36,21 +49,7 @@ public class RCSController {
 
         String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
 
-        log.info("Outgoing RCS Text Message Request----> \n: {}",json);
-
-        return messageServiceRCS.sendMessaage(request);
-
-    }
-    @PostMapping("/sendRCSTemplateMessage")
-    public Object sendMessage(@RequestBody RCSTemplateMessageRequest request) throws JsonProcessingException {
-
-        ObjectMapper mapper=new ObjectMapper();
-
-//        mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
-
-        String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
-
-        log.info("Outgoing RCS Text Message Request----> \n: {}",json);
+//        log.info("Contoller-->Outgoing RCS Template Message Request----> \n: {}",json);
 
         return messageServiceRCS.sendMessage(request);
 

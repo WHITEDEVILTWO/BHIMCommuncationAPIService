@@ -5,12 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.MediaUploadRequest;
+import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.WaTextMsgRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Consent;
 import org.npci.bhim.BHIMSMSserviceAPI.model.GetConsentData;
 import org.npci.bhim.BHIMSMSserviceAPI.model.MediaUpload;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
-import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.TextMsgRequest;
-import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.MediaUploadResponse;
 import org.npci.bhim.BHIMSMSserviceAPI.service.AuthenticateService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.MessageService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.RedisService;
@@ -55,7 +54,7 @@ public class controller {
         return authenticateService.sendRegRequest(request);
     }
     @PostMapping("/sendmessage")
-    public Mono<Map<String, Object>> sedMessage(@RequestBody TextMsgRequest request) throws JsonProcessingException {
+    public Mono<Map<String, Object>> sedMessage(@RequestBody WaTextMsgRequest request) throws JsonProcessingException {
 
         ObjectMapper mapper=new ObjectMapper();
         System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
@@ -95,7 +94,7 @@ public class controller {
     }
 
     @PostMapping("/uploadMedia")
-    public MediaUploadResponse uploadMedia(@RequestBody MediaUpload request) throws JsonProcessingException {
+    public Mono<Map<String, Object>> uploadMedia(@RequestBody MediaUpload request) throws JsonProcessingException {
 
         ObjectMapper mapper=new ObjectMapper();
         log.info(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));

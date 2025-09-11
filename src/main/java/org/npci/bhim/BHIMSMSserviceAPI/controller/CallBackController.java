@@ -10,9 +10,8 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @RestController
-@RequestMapping("/waAPICallBack/sinch")
+@RequestMapping("/callback/sinch")
 @Slf4j
-@EnableAsync
 public class CallBackController {
 
     private static final List<Map<String,Object>> callbackList=new CopyOnWriteArrayList<>();
