@@ -9,7 +9,6 @@ import org.npci.bhim.BHIMSMSserviceAPI.convAPIConstants.ConvAPIConstants;
 import org.npci.bhim.BHIMSMSserviceAPI.entities.MediaResponseEntity;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.MediaUploadRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.WaTextMsgRequest;
-import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.MediaUploadResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -20,8 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +31,8 @@ public class MessageService {
     private final RedisService redisService;
 
     private final TokenManager tokenManager;
+
+    public static final String Request_Channel_key="WA_access_token";
 
     @Value("${npci.wa.uname}")
     String keyId;
@@ -45,14 +46,17 @@ public class MessageService {
         ObjectMapper mapper=new ObjectMapper();
         mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
         String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+        AtomicInteger count= new AtomicInteger();
+
 //        log.info("Outgoing RCS Template Message Request----> \n: {}",json);
-        return tokenManager.getValidToken(keyId, key)
+        return tokenManager.getValidToken(keyId, key,Request_Channel_key)
                 .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
                 .onErrorResume(ex -> {
                     // If token expired (403), regenerate and retry once
                     if (ex.getMessage()!=null && ex.getMessage().contains("403")) {
+                        log.info("Count of Failed messages for WA text Messages: {}",count.getAndIncrement());
                         log.warn("!Access token might be expired or not authorized, regenerating and retrying...");
-                        return tokenManager.regenerateAccessToken(keyId, key)
+                        return tokenManager.regenerateAccessToken(keyId, key,Request_Channel_key)
                                 .flatMap(newToken -> sendMessageWithToken(request, newToken));
                     }
                     return Mono.error(ex); // propagate other errors
@@ -93,8 +97,8 @@ public class MessageService {
                                         String  json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
                                         String responseId = (String) body.get("responseId");
                                         log.info("ResponseId: {}",responseId);
-                                        log.info("Saving response and body to redis\n: {}",request);
-                                        redisService.save(responseId, request)
+                                        log.info("Saving response and body to redis\n: {}",json);
+                                        redisService.save(responseId, json)
                                                 .doOnNext(saved -> log.info("✅ Saved to Redis: {}", saved))
                                                 .doOnError(err -> log.error("❌ Failed to save to Redis", err))
                                                 .subscribe();
@@ -148,13 +152,13 @@ public class MessageService {
         String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
 
 //        log.info("Outgoing RCS Template Message Request----> \n: {}",json);
-        return tokenManager.getValidToken(keyId, key)
+        return tokenManager.getValidToken(keyId, key,Request_Channel_key)
                 .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
                 .onErrorResume(ex -> {
                     // If token expired (403), regenerate and retry once
                     if (ex.getMessage()!=null && ex.getMessage().contains("403")) {
                         log.warn("!Access token might be expired or not authorized, regenerating and retrying...");
-                        return tokenManager.regenerateAccessToken(keyId, key)
+                        return tokenManager.regenerateAccessToken(keyId, key,Request_Channel_key)
                                 .flatMap(newToken -> sendMessageWithToken(request, newToken));
                     }
                     return Mono.error(ex); // propagate other errors

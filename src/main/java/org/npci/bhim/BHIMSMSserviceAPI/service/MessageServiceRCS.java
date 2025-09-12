@@ -30,6 +30,8 @@ public class MessageServiceRCS {
     private final RedisService redisService;
 
     private final TokenManager tokenManager;
+
+    public static final String Request_Channel_key="RCS_access_token";
     @Value("${npci.rcs.uname}")
     String keyId;
     @Value("${npci.rcs.key}")
@@ -46,13 +48,13 @@ public class MessageServiceRCS {
         String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
 
 //        log.info("Outgoing RCS Template Message Request----> \n: {}",json);
-        return tokenManager.getValidToken(keyId, key)
+        return tokenManager.getValidToken(keyId, key,Request_Channel_key)
                 .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
                 .onErrorResume(ex -> {
                     // If token expired (403), regenerate and retry once
                     if (ex.getMessage()!=null && ex.getMessage().contains("403")) {
                         log.warn("!Access token might be expired or not authorized, regenerating and retrying...");
-                        return tokenManager.regenerateAccessToken(keyId, key)
+                        return tokenManager.regenerateAccessToken(keyId, key,Request_Channel_key)
                                 .flatMap(newToken -> sendMessageWithToken(request, newToken));
                     }
                     return Mono.error(ex); // propagate other errors
@@ -70,13 +72,13 @@ public class MessageServiceRCS {
         String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
 
 //        log.info("Outgoing RCS Text Message Request----> \n: {}",json);
-        return tokenManager.getValidToken(keyId, key)
+        return tokenManager.getValidToken(keyId, key,Request_Channel_key)
                 .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
                 .onErrorResume(ex -> {
                     // If token expired (403), regenerate and retry once
                     if (ex.getMessage().contains("403")) {
                         log.warn("Access token might be expired, regenerating and retrying...");
-                        return tokenManager.regenerateAccessToken(keyId, key)
+                        return tokenManager.regenerateAccessToken(keyId, key,Request_Channel_key)
                                 .flatMap(newToken -> sendMessageWithToken(request, newToken));
                     }
                     return Mono.error(ex); // propagate other errors

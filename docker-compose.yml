@@ -1,5 +1,17 @@
 version: '3.8'
 services:
+  redis:
+    image: bitnami/redis:7.0.7-debian-11-r0
+    container_name: redis
+    ports:
+      - "6379:6379"
+    environment:
+      ALLOW_EMPTY_PASSWORD: yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
   yugabytedb:
     image: yugabytedb/yugabyte:latest
     container_name: yugabytedb
@@ -10,6 +22,7 @@ services:
     command: bin/yugabyted start --daemon=false
     volumes:
       - yugabytedb_data:/var/lib/yugabyte # Persistent data storage
+#      - /home/ganesh/yugabyte_data:/var/lib/yugabyte
 
   springboot-app:
     build:
@@ -27,6 +40,8 @@ services:
       SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
     depends_on:
       - yugabytedb # Ensures YugabyteDB starts before the Spring Boot app
+      - redis
 
 volumes:
   yugabytedb_data: # Define a named volume for persistent data
+#    driver: local

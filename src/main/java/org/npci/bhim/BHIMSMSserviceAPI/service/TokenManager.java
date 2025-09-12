@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.Objects;
 
 @Component
 @Slf4j
@@ -40,23 +41,26 @@ public class TokenManager {
      * 2. Refresh token if access token missing.
      * 3. Regenerate access token in background if needed.
      */
-    public Mono<String> getValidToken(String keyId, String key) {
-        return redisService.get("RCS_access_token")
+    public Mono<String> getValidToken(String keyId, String key,String Request_Channel_key) {
+        return redisService.get(Request_Channel_key)
                 .map(Object::toString)
                 .switchIfEmpty(
-                        // Access token not found
-                        Mono.defer(() -> redisService.get("RCS_refresh_token")
-                                .map(Object::toString)
-                                .doOnNext(refresh -> log.info("⚠️ Using refresh token temporarily: {}", refresh))
-                                .switchIfEmpty(regenerateAccessToken(keyId, key))
-                        )
+
+                        // Access token not found -->regenerate
+                        regenerateAccessToken(keyId, key,Request_Channel_key).map(Objects::toString)
+                                .doOnNext(refresh->log.info("⚠️ Using newly generated token"))
+//                        Mono.defer(() -> redisService.get("RCS_refresh_token")
+//                                .map(Object::toString)
+//                                .doOnNext(refresh -> log.info("⚠️ Using refresh token temporarily: {}", refresh))
+//                                .switchIfEmpty(regenerateAccessToken(keyId, key))
+//                        )
                 );
     }
 
     /**
      * Regenerates access token immediately and returns it.
      */
-    public Mono<String> regenerateAccessToken(String keyId, String key) {
+    public Mono<String> regenerateAccessToken(String keyId, String key,String Request_Channel_key) {
         Registration request = new Registration();
         request.setUsername(keyId);
         request.setPassword(key);
@@ -64,14 +68,10 @@ public class TokenManager {
         // Save regenerated token to Redis before returning
         return regenerateTokenService.regenerateToken(request)
                 .flatMap(resp -> {
-                    log.info("✅ Access token regenerated immediately: {}", resp);
+                    log.info("✅ Access token regenerated immediately: true");
                     //returning geerated token
-                    return redisService.get("RCS_access_token").map(Object::toString);
+                    return redisService.get(Request_Channel_key).map(Object::toString);
                 })
                 .switchIfEmpty(Mono.error(new RuntimeException("❌ Failed to regenerate access token")));
     }
-
-
-
-
 }

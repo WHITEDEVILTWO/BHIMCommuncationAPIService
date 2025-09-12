@@ -5,7 +5,9 @@ FROM openjdk:17-jdk-slim
 WORKDIR /app
 
 # Copy the JAR file (make sure you build it first using mvn/gradle)
-COPY target/*.jar app.jar
+COPY target/BHIMSMSserviceAPI-0.0.1-SNAPSHOT.jar app.jar
+
+RUN apt-get update && apt-get install -y curl redis-tools postgresql-client
 
 # Run the JAR
 ENTRYPOINT ["java", "-jar", "app.jar"]

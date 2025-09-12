@@ -4,12 +4,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.npci.bhim.BHIMSMSserviceAPI.entities.WAResponses;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.MediaUploadRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.WaTextMsgRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Consent;
 import org.npci.bhim.BHIMSMSserviceAPI.model.GetConsentData;
 import org.npci.bhim.BHIMSMSserviceAPI.model.MediaUpload;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
+import org.npci.bhim.BHIMSMSserviceAPI.repos.WAResponseRepository;
 import org.npci.bhim.BHIMSMSserviceAPI.service.AuthenticateService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.MessageService;
 import org.npci.bhim.BHIMSMSserviceAPI.service.RedisService;
@@ -25,11 +27,17 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/whatsapp")
 @Slf4j
-@EnableAsync
 public class controller {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    public controller(AuthenticateService authenticateService, MessageService messageService, RedisService redisService, WAResponseRepository waResponseRepository) {
+        this.authenticateService = authenticateService;
+        this.messageService = messageService;
+        this.redisService = redisService;
+        this.waResponseRepository = waResponseRepository;
+    }
 
     @PostConstruct
     public void logObjectMapperModules() {
@@ -44,7 +52,36 @@ public class controller {
 
     @Autowired
     private RedisService redisService;
+    @Autowired
+    private WAResponseRepository waResponseRepository;
 
+    @PostMapping("/redissavetest")
+    public void savetoredistest(){
+        redisService.save("Ganesh","BABU");
+        WAResponses responses=new WAResponses();
+        responses.setResponseId("123456789");
+        responses.setRequestBody("{\n" +
+                "  \"recipient_type\" : \"individual\",\n" +
+                "  \"to\" : \"917893411160\",\n" +
+                "  \"type\" : \"template\",\n" +
+                "  \"template\" : {\n" +
+                "    \"name\" : \"p2p_cohort_19082025\",\n" +
+                "    \"language\" : {\n" +
+                "      \"policy\" : \"deterministic\",\n" +
+                "      \"code\" : \"en\"\n" +
+                "    },\n" +
+                "    \"components\" : null\n" +
+                "  },\n" +
+                "  \"metadata\" : {\n" +
+                "    \"messageId\" : \"8d3fe6f3-21fc-4130-9c29-5a7be3799340\",\n" +
+                "    \"transactionId\" : \"a5da78ac-01b5-4fec-b3eb-0e1402f8f577\",\n" +
+                "    \"callbackDlrUrl\" : \"https://bhimupi.com\"\n" +
+                "  }\n" +
+                "}");
+        waResponseRepository.save(responses);
+        log.info("Saved to db");
+
+    }
     @PostMapping("/getToken")
     public Mono<ResponseEntity<Map<String,Object>>> getToken(@ModelAttribute Registration request) throws JsonProcessingException {
         ObjectMapper mapper=new ObjectMapper();
