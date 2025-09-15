@@ -32,8 +32,8 @@ public class RegenerateTokenService {
         this.webClient = webClient;
         this.redisService = redisService;
     }
-    @Async
-    public  String regenerateToken(Registration request) {
+
+    public Mono<Object> regenerateToken(Registration request) {
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("grant_type", request.getGrant_type());
         formData.add("client_id", request.getClient_id());
@@ -42,7 +42,7 @@ public class RegenerateTokenService {
 
         final String PROD_URL = String.format("https://auth.aclwhatsapp.com/realms/ipmessaging/protocol/openid-connect/token");
 //        final String UAT_URL = String.format("https://apiuat.aclwhatsapp.com/auth/realms/ipmessaging/protocol/openid-connect/token");
-        Mono<ResponseEntity<Map<String, Object>>> reponsebody = webClient.post()
+        return webClient.post()
                 .uri(PROD_URL)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
                 .header(HttpHeaders.CACHE_CONTROL, "no-cache")
@@ -54,35 +54,33 @@ public class RegenerateTokenService {
                             .doOnNext(body ->
                                     log.info("Response Body :{} ", body))
                             .flatMap(body -> {
-                                log.info("Response Body: {}", body);
+//                                log.info("Response Body: {}", body);
 
                                 //  Extract keys
                                 String accessToken = (String) body.get("access_token");
-                                log.info("Access token is : {}",accessToken);
+                                log.info("Access token is : {}", accessToken);
                                 String refreshToken = (String) body.get("refresh_token");
                                 Integer expiresIn = (Integer) body.get("expires_in");
-                                Integer refresh_expires_in=(Integer) body.get("refresh_expires_in");
+                                Integer refresh_expires_in = (Integer) body.get("refresh_expires_in");
 
-                                if (accessToken != null &&formData.toSingleValueMap().containsValue("npcibhimpd") && expiresIn != null ) {
+                                if (accessToken != null && formData.toSingleValueMap().containsValue("npcibhimpd") && expiresIn != null) {
                                     // ✅ Store in Redis with TTL
                                     return redisService
                                             .save("WA_access_token", accessToken, Duration.ofSeconds(expiresIn))
                                             .and(redisService.save("WA_refresh_token", refreshToken, Duration.ofSeconds(refresh_expires_in)))
-                                            .doOnNext(success -> log.info("Token cached: {}", success))
-                                            .thenReturn(ResponseEntity.status(clientResponse.statusCode()).body(body));
-                                }else if(accessToken != null &&formData.toSingleValueMap().containsValue("bhimapp_promo") &&expiresIn != null ){
+                                            .doOnNext(success -> log.info("Token cached"))
+                                            .thenReturn(accessToken);
+                                } else if (accessToken != null && formData.toSingleValueMap().containsValue("bhimapp_promo") && expiresIn != null) {
                                     return redisService
                                             .save("RCS_access_token", accessToken, Duration.ofSeconds(expiresIn))
                                             .and(redisService.save("RCS_refresh_token", refreshToken, Duration.ofSeconds(refresh_expires_in)))
-                                            .doOnNext(success -> log.info("Token cached: {}", success))
-                                            .thenReturn(ResponseEntity.status(clientResponse.statusCode()).body(body));
-                                }else {
-                                    return Mono.just(ResponseEntity.status(clientResponse.statusCode()).body(body));
+                                            .doOnNext(success -> log.info("Token cached"))
+                                            .thenReturn(accessToken);
+                                } else {
+                                    return Mono.just("Failed to generate toke ");
                                 }
                             });
-//                           .map(body -> ResponseEntity.status(clientResponse.statusCode()).body(body));
                 });
 
-        return "Token refreshed";
     }
 }

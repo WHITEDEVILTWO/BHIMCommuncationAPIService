@@ -1,3 +1,9 @@
+/**
+ *
+ * Unless Explicitly called  This service is not being used. We are using regenrerate token service for automatic toke generation
+ *
+ *
+ */
 package org.npci.bhim.BHIMSMSserviceAPI.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -33,7 +39,7 @@ public class AuthenticateService {
 
     private final WebClient webClient;
 
-    private final  RedisService redisService;
+    private final RedisService redisService;
 
 
     private final TokenManager tokenManager;
@@ -63,24 +69,24 @@ public class AuthenticateService {
 
                                 //  Extract keys
                                 String accessToken = (String) body.get("access_token");
-                                log.info("Access token is : {}",accessToken);
+                                log.info("Access token is : {}", accessToken);
                                 String refreshToken = (String) body.get("refresh_token");
                                 Integer expiresIn = (Integer) body.get("expires_in");
-                                Integer refresh_expires_in=(Integer) body.get("refresh_expires_in");
+                                Integer refresh_expires_in = (Integer) body.get("refresh_expires_in");
 
-                                if (accessToken != null &&formData.toSingleValueMap().containsValue("npcibhimpd") && expiresIn != null ) {
+                                if (accessToken != null && formData.toSingleValueMap().containsValue("npcibhimpd") && expiresIn != null) {
                                     // ✅ Store in Redis with TTL
                                     return redisService.save("WA_access_token", accessToken, Duration.ofSeconds(expiresIn))
                                             .and(redisService.save("WA_refresh_token", refreshToken, Duration.ofSeconds(refresh_expires_in)))
                                             .doOnNext(success -> log.info("Token cached: {}", success))
                                             .thenReturn(ResponseEntity.status(clientResponse.statusCode()).body(body));
-                                }else if(accessToken != null &&formData.toSingleValueMap().containsValue("bhimapp_promo") &&expiresIn != null ){
+                                } else if (accessToken != null && formData.toSingleValueMap().containsValue("bhimapp_promo") && expiresIn != null) {
                                     return redisService
                                             .save("RCS_access_token", accessToken, Duration.ofSeconds(expiresIn))
                                             .and(redisService.save("RCS_refresh_token", refreshToken, Duration.ofSeconds(refresh_expires_in)))
                                             .doOnNext(success -> log.info("Token cached: {}", success))
                                             .thenReturn(ResponseEntity.status(clientResponse.statusCode()).body(body));
-                                }else {
+                                } else {
                                     return Mono.just(ResponseEntity.status(clientResponse.statusCode()).body(body));
                                 }
                             });
@@ -107,120 +113,121 @@ public class AuthenticateService {
 //
 //                });
 //    }
-    public Mono<Map<String, Object>> optInRequest(Consent request) {
-        String token= redisService.get("WA_access_token").block().toString();
-        if(token == null){
-            tokenManager.getToken();
-            token= redisService.get("WA_refesh_token").block().toString();
-        }
-        final String PROD_URL = String.format("https://optin.aclwhatsapp.com/api/v1/optin/bulk");
-//        final String UAT_URL = String.format("https://pushuat.aclwhatsapp.com/api/v1/wa/optin/bulk");
-        return webClient.post()
-                .uri(PROD_URL)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchangeToMono(clientResponse -> {
-                    HttpStatus status = (HttpStatus) clientResponse.statusCode();
-                    System.out.println("HTTP Status code: " + status.value());
+    /**
+     public Mono<Map<String, Object>> optInRequest(Consent request) {
+     String token= redisService.get("WA_access_token").block().toString();
+     if(token == null){
+     tokenManager.getToken();
+     token= redisService.get("WA_refesh_token").block().toString();
+     }
+     final String PROD_URL = String.format("https://optin.aclwhatsapp.com/api/v1/optin/bulk");
+     //        final String UAT_URL = String.format("https://pushuat.aclwhatsapp.com/api/v1/wa/optin/bulk");
+     return webClient.post()
+     .uri(PROD_URL)
+     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+     .contentType(MediaType.APPLICATION_JSON)
+     .accept(MediaType.APPLICATION_JSON)
+     .bodyValue(request)
+     .exchangeToMono(clientResponse -> {
+     HttpStatus status = (HttpStatus) clientResponse.statusCode();
+     System.out.println("HTTP Status code: " + status.value());
 
-                    MediaType contentType = clientResponse.headers().contentType().orElse(MediaType.APPLICATION_OCTET_STREAM);
+     MediaType contentType = clientResponse.headers().contentType().orElse(MediaType.APPLICATION_OCTET_STREAM);
 
-                    // If response is JSON, parse it into Map
-                    if (status.is2xxSuccessful()) {
-                        return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
-                                })
-                                .doOnNext(body -> System.out.println("Response Body: " + body));
-                    } else {
-                        // Otherwise, read it as plain String and log for debugging
-                        return clientResponse.bodyToMono(String.class)
-                                .flatMap(body -> {
-                                    System.err.println("Non-JSON response body: " + body);
-                                    return Mono.error(new RuntimeException("Unexpected response type or error: " + status));
-                                });
-                    }
-                });
-    }
+     // If response is JSON, parse it into Map
+     if (status.is2xxSuccessful()) {
+     return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
+     })
+     .doOnNext(body -> System.out.println("Response Body: " + body));
+     } else {
+     // Otherwise, read it as plain String and log for debugging
+     return clientResponse.bodyToMono(String.class)
+     .flatMap(body -> {
+     System.err.println("Non-JSON response body: " + body);
+     return Mono.error(new RuntimeException("Unexpected response type or error: " + status));
+     });
+     }
+     });
+     }
 
-    public Mono<Map<String, Object>> optOutRequest(Consent request) {
-        String token= redisService.get("WA_access_token").block().toString();
-        if(token == null){
-            tokenManager.getToken();
-            token= redisService.get("WA_refesh_token").block().toString();
-        }
-        final String PROD_URL = String.format("https://optin.aclwhatsapp.com/api/v1/optout/bulk");
-//        final String UAT_URL = String.format("https://pushuat.aclwhatsapp.com/api/v1/wa/optout/bulk");
-        return webClient.post()
-                .uri(PROD_URL)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchangeToMono(clientResponse -> {
-                    HttpStatus status = (HttpStatus) clientResponse.statusCode();
-                    System.out.println("HTTP Status code: " + status.value());
+     public Mono<Map<String, Object>> optOutRequest(Consent request) {
+     String token= redisService.get("WA_access_token").block().toString();
+     if(token == null){
+     tokenManager.getToken();
+     token= redisService.get("WA_refesh_token").block().toString();
+     }
+     final String PROD_URL = String.format("https://optin.aclwhatsapp.com/api/v1/optout/bulk");
+     //        final String UAT_URL = String.format("https://pushuat.aclwhatsapp.com/api/v1/wa/optout/bulk");
+     return webClient.post()
+     .uri(PROD_URL)
+     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+     .contentType(MediaType.APPLICATION_JSON)
+     .accept(MediaType.APPLICATION_JSON)
+     .bodyValue(request)
+     .exchangeToMono(clientResponse -> {
+     HttpStatus status = (HttpStatus) clientResponse.statusCode();
+     System.out.println("HTTP Status code: " + status.value());
 
-                    MediaType contentType = clientResponse.headers().contentType().orElse(MediaType.APPLICATION_OCTET_STREAM);
+     MediaType contentType = clientResponse.headers().contentType().orElse(MediaType.APPLICATION_OCTET_STREAM);
 
-                    // If response is JSON, parse it into Map
-                    if (status.is2xxSuccessful()) {
-                        return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
-                                })
-                                .doOnNext(body -> System.out.println("Response Body: " + body));
-                    } else {
-                        // Otherwise, read it as plain String and log for debugging
-                        return clientResponse.bodyToMono(String.class)
-                                .flatMap(body -> {
-                                    System.err.println("Non-JSON response body: " + body);
-                                    return Mono.error(new RuntimeException("Unexpected response type or error: " + status));
-                                });
-                    }
-                });
-    }
+     // If response is JSON, parse it into Map
+     if (status.is2xxSuccessful()) {
+     return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
+     })
+     .doOnNext(body -> System.out.println("Response Body: " + body));
+     } else {
+     // Otherwise, read it as plain String and log for debugging
+     return clientResponse.bodyToMono(String.class)
+     .flatMap(body -> {
+     System.err.println("Non-JSON response body: " + body);
+     return Mono.error(new RuntimeException("Unexpected response type or error: " + status));
+     });
+     }
+     });
+     }
 
-    public Mono<byte[]> getConsent(GetConsentData request) {
-        String token= redisService.get("WA_access_token").block().toString();
-        if(token == null){
-            tokenManager.getToken();
-            token= redisService.get("WA_refesh_token").block().toString();
-        }
-        String url = String.format("https://smartta.aclwhatsapp.com/optindata/v1/" + request.getFromDate().toString() + "/" + request.getToDate().toString());
-        System.out.println(url);
-//        return webClient.get()
-//                .uri(url)
-//                .header(HttpHeaders.AUTHORIZATION,"Bearer "+token)
-//                .exchangeToMono(clientResponse -> {
-//                    HttpStatus status = (HttpStatus) clientResponse.statusCode();
-//                    System.out.println("HTTP Status code: " + status.value());
-//
-////                    MediaType contentType = clientResponse.headers().contentType().orElse(MediaType.APPLICATION_OCTET_STREAM);
-//
-//                    // If response is JSON, parse it into Map
-//                        return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-//                                .doOnNext(body -> log.info("Response Body: {}", body))
-//                                .map(body ->ResponseEntity.status(clientResponse.statusCode()).body(body));
-//                });
-        return webClient.get()
-                .uri(url)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .exchangeToMono(response -> {
-                    log.info("Client response code : {}", response.statusCode().value());
-                    return response.bodyToMono(byte[].class)
-                            .doOnNext(bytes -> {
-                                String JsonString = new String(bytes, StandardCharsets.UTF_8);
-                                ObjectMapper mapper = new ObjectMapper();
-                                try {
-                                    List<Map<String, Object>> parsedList = mapper.readValue(JsonString, new TypeReference<List<Map<String, Object>>>() {
-                                    });
-                                    String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(parsedList);
-                                    log.info("List of Consents:\n {}", parsedList);
-                                } catch (JsonProcessingException e) {
-                                    throw new RuntimeException(e);
-                                }
+     public Mono<byte[]> getConsent(GetConsentData request) {
+     String token= redisService.get("WA_access_token").block().toString();
+     if(token == null){
+     tokenManager.getToken();
+     token= redisService.get("WA_refesh_token").block().toString();
+     }
+     String url = String.format("https://smartta.aclwhatsapp.com/optindata/v1/" + request.getFromDate().toString() + "/" + request.getToDate().toString());
+     System.out.println(url);
+     //        return webClient.get()
+     //                .uri(url)
+     //                .header(HttpHeaders.AUTHORIZATION,"Bearer "+token)
+     //                .exchangeToMono(clientResponse -> {
+     //                    HttpStatus status = (HttpStatus) clientResponse.statusCode();
+     //                    System.out.println("HTTP Status code: " + status.value());
+     //
+     ////                    MediaType contentType = clientResponse.headers().contentType().orElse(MediaType.APPLICATION_OCTET_STREAM);
+     //
+     //                    // If response is JSON, parse it into Map
+     //                        return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+     //                                .doOnNext(body -> log.info("Response Body: {}", body))
+     //                                .map(body ->ResponseEntity.status(clientResponse.statusCode()).body(body));
+     //                });
+     return webClient.get()
+     .uri(url)
+     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+     .exchangeToMono(response -> {
+     log.info("Client response code : {}", response.statusCode().value());
+     return response.bodyToMono(byte[].class)
+     .doOnNext(bytes -> {
+     String JsonString = new String(bytes, StandardCharsets.UTF_8);
+     ObjectMapper mapper = new ObjectMapper();
+     try {
+     List<Map<String, Object>> parsedList = mapper.readValue(JsonString, new TypeReference<List<Map<String, Object>>>() {
+     });
+     String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(parsedList);
+     log.info("List of Consents:\n {}", parsedList);
+     } catch (JsonProcessingException e) {
+     throw new RuntimeException(e);
+     }
 
-                                log.info("Raw Response: {} ", new String(bytes, StandardCharsets.UTF_8));
-                            });
-                });
-    }
+     log.info("Raw Response: {} ", new String(bytes, StandardCharsets.UTF_8));
+     });
+     });
+     }*/
 }

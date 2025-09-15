@@ -4,11 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.npci.bhim.BHIMSMSserviceAPI.entities.WAResponses;
+import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.WAResponses;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.MediaUploadRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.WaTextMsgRequest;
-import org.npci.bhim.BHIMSMSserviceAPI.model.Consent;
-import org.npci.bhim.BHIMSMSserviceAPI.model.GetConsentData;
 import org.npci.bhim.BHIMSMSserviceAPI.model.MediaUpload;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
 import org.npci.bhim.BHIMSMSserviceAPI.repos.WAResponseRepository;
@@ -18,7 +16,6 @@ import org.npci.bhim.BHIMSMSserviceAPI.service.RedisService;
 import org.npci.bhim.BHIMSMSserviceAPI.utils.MediaUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
@@ -29,6 +26,10 @@ import java.util.Map;
 @Slf4j
 public class controller {
 
+    private final AuthenticateService authenticateService;
+    private final MessageService messageService;
+    private final RedisService redisService;
+    private final WAResponseRepository waResponseRepository;
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -44,16 +45,6 @@ public class controller {
         objectMapper.getRegisteredModuleIds().forEach(id -> System.out.println("Registered module: " + id));
     }
 
-    @Autowired
-    private AuthenticateService authenticateService;
-
-    @Autowired
-    private MessageService messageService;
-
-    @Autowired
-    private RedisService redisService;
-    @Autowired
-    private WAResponseRepository waResponseRepository;
 
     @PostMapping("/redissavetest")
     public void savetoredistest(){
@@ -98,7 +89,7 @@ public class controller {
 
         return messageService.sendMessage(request);
     }
-
+/**
     @PostMapping("/optin")
     public Mono<Map<String, Object>> sedMessageOptIn(@RequestBody Consent request) throws JsonProcessingException {
 
@@ -129,7 +120,7 @@ public class controller {
 
         return authenticateService.getConsent(request);
     }
-
+*/
     @PostMapping("/uploadMedia")
     public Mono<Map<String, Object>> uploadMedia(@RequestBody MediaUpload request) throws JsonProcessingException {
 

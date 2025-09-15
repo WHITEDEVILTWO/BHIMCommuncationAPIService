@@ -20,20 +20,21 @@ public class TokenManager {
         this.redisService = redisService;
     }
 
-    public Mono<String> getToken() {
-        return regenerateTokenService.regenerateToken(new Registration());
-//        return CompletableFuture.completedFuture(token);
-    }
+//    public Mono<String> getToken() {
+//        return regenerateTokenService.regenerateToken(new Registration());
+
+    /// /        return CompletableFuture.completedFuture(token);
+//    }
 
 
-    public Mono<String> getRCSToken(String username, String password) {
-        System.out.println("calling regenerateToken Method.........");
-        Registration request = new Registration();
-        request.setUsername(username);
-        request.setPassword(password);
-        return regenerateTokenService.regenerateToken(request);
-
-    }
+//    public Mono<String> getRCSToken(String username, String password) {
+//        System.out.println("calling regenerateToken Method.........");
+//        Registration request = new Registration();
+//        request.setUsername(username);
+//        request.setPassword(password);
+//        return regenerateTokenService.regenerateToken(request);
+//
+//    }
 
     /**
      * Returns a valid token:
@@ -68,7 +69,7 @@ public class TokenManager {
         // Save regenerated token to Redis before returning
         return regenerateTokenService.regenerateToken(request)
                 .flatMap(resp -> {
-                    log.info("✅ Access token regenerated immediately: true");
+                    log.info("✅ Access token regenerated immediately-> Status:: true");
                     //returning geerated token
                     return redisService.get(Request_Channel_key).map(Object::toString);
                 })

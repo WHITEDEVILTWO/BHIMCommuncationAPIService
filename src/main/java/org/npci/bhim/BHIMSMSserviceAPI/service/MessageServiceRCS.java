@@ -7,6 +7,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.npci.bhim.BHIMSMSserviceAPI.rcsMessageRequests.RCSTemplateMessageRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.rcsMessageRequests.RCSTextMessageRequest;
+import org.npci.bhim.BHIMSMSserviceAPI.repoServices.RCSResponseService;
+import org.npci.bhim.BHIMSMSserviceAPI.repos.RCSDLRReportRepository;
+import org.npci.bhim.BHIMSMSserviceAPI.repos.RCSResponseRepository;
+import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.RcsResponses;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -28,8 +32,9 @@ public class MessageServiceRCS {
 
     private final WebClient webClient;
     private final RedisService redisService;
-
     private final TokenManager tokenManager;
+    private final RCSResponseService rcsResponseService;
+
 
     public static final String Request_Channel_key="RCS_access_token";
     @Value("${npci.rcs.uname}")
@@ -42,9 +47,7 @@ public class MessageServiceRCS {
 
 
         ObjectMapper mapper=new ObjectMapper();
-
         mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
-
         String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
 
 //        log.info("Outgoing RCS Template Message Request----> \n: {}",json);
@@ -101,8 +104,22 @@ public class MessageServiceRCS {
 
                     if (status.is2xxSuccessful() && MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
                         return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                                .doOnNext(body->
-                                        log.info("✅ Message sent successfully. Status: {}, Response: {}", status.value(), body))
+                                .doOnNext(body->{
+                                        log.info("✅ Message sent successfully. Status: {}", status.value());
+                                            ObjectMapper mapper=new ObjectMapper();
+                                            mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+                                            try {
+                                                String  json=mapper.writeValueAsString(request);
+                                                RcsResponses entity=new RcsResponses();
+                                                entity.setMessageId((String) body.get("message_id"));
+                                                entity.setRequestBody(json);
+                                                rcsResponseService.saveTODb(entity);
+                                                log.info("✅ Saved to DB");
+                                            } catch (JsonProcessingException e) {
+                                                throw new RuntimeException(e);
+                                            }
+                                }
+                                )
                                 .doOnNext(body-> {
                                     ObjectMapper mapper=new ObjectMapper();
                                     mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
@@ -110,11 +127,12 @@ public class MessageServiceRCS {
                                         String  json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
                                         String messageId = (String) body.get("message_id");
                                         log.info("MessageID: {}",messageId);
-                                        log.info("Saving response and body to redis\n: {}",request);
+                                        log.info("Saving response and body to redis\n: {}",json);
                                         redisService.save(messageId, request, Duration.ofSeconds(5000))
-                                                .doOnNext(saved -> log.info("✅ Saved to Redis: {}", saved))
+                                                .doOnNext(saved -> log.info("✅ Saved to Redis: Status ::TRUE"))
                                                 .doOnError(err -> log.error("❌ Failed to save to Redis", err))
                                                 .subscribe();
+
                                     } catch (JsonProcessingException e) {
                                         throw new RuntimeException("unable to save to redis / json parsing exception. ",e);
                                     }
@@ -160,7 +178,7 @@ public class MessageServiceRCS {
                     if (status.is2xxSuccessful() && MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
                         return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                                 .doOnNext(body->
-                                        log.info("✅ Message sent successfully. Status: {}, Response: {}", status.value(), body)
+                                        log.info("✅ Message sent successfully. Status: {}", status.value())
                                 )
                                 .doOnNext(body-> {
                                     ObjectMapper mapper=new ObjectMapper();

@@ -1,7 +1,6 @@
 package org.npci.bhim.BHIMSMSserviceAPI.repos;
 
 import org.npci.bhim.BHIMSMSserviceAPI.entities.MediaResponseEntity;
-import org.npci.bhim.BHIMSMSserviceAPI.entities.RcsResponses;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

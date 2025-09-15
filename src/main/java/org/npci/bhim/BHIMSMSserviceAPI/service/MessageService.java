@@ -11,6 +11,9 @@ import org.npci.bhim.BHIMSMSserviceAPI.convAPIConstants.ConvAPIConstants;
 import org.npci.bhim.BHIMSMSserviceAPI.entities.MediaResponseEntity;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.MediaUploadRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.WaTextMsgRequest;
+import org.npci.bhim.BHIMSMSserviceAPI.repoServices.WAResponseService;
+import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.RcsResponses;
+import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.WAResponses;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -35,6 +38,8 @@ public class MessageService {
     private final TokenManager tokenManager;
 
     public static final String Request_Channel_key="WA_access_token";
+
+    private final WAResponseService waResponseService;
 
     @Value("${npci.wa.uname}")
     String keyId;
@@ -90,8 +95,21 @@ public class MessageService {
                     if (status.is2xxSuccessful() && MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
                         return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
                                 })
-                                .doOnNext(body->
-                                        log.info("✅ Message sent successfully. Status: {}, Response: {}", status.value(), body))
+                                .doOnNext(body->{
+                                        log.info("✅ Message sent successfully. Status: {}, Response: {}", status.value(), body);
+                                    ObjectMapper mapper=new ObjectMapper();
+                                    mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+                                    try {
+                                        String  json=mapper.writeValueAsString(request);
+                                        WAResponses entity=new WAResponses();
+                                        entity.setResponseId((String) body.get("responseId"));
+                                        entity.setRequestBody(json);
+                                        waResponseService.saveToDb(entity);
+                                        log.info("✅ Saved to DB");
+                                    } catch (JsonProcessingException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                })
                                 .doOnNext(body-> {
                                     ObjectMapper mapper=new ObjectMapper();
                                     mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
