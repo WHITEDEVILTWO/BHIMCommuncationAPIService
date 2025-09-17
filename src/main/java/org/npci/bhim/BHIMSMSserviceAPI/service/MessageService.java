@@ -1,5 +1,6 @@
 /**
- * Repalle Ganesh Babu*/
+ * Repalle Ganesh Babu
+ */
 package org.npci.bhim.BHIMSMSserviceAPI.service;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -37,7 +39,7 @@ public class MessageService {
 
     private final TokenManager tokenManager;
 
-    public static final String Request_Channel_key="WA_access_token";
+    public static final String Request_Channel_key = "WA_access_token";
 
     private final WAResponseService waResponseService;
 
@@ -50,31 +52,61 @@ public class MessageService {
 
     public Mono<Map<String, Object>> sendMessage(WaTextMsgRequest request) throws JsonProcessingException {
 //        log.info("Rcs Template Message Request------>\n,{}",request);
-        ObjectMapper mapper=new ObjectMapper();
+        ObjectMapper mapper = new ObjectMapper();
         mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
-        String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
-        AtomicInteger count= new AtomicInteger();
+        String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+        AtomicInteger count = new AtomicInteger();
 
 //        log.info("Outgoing RCS Template Message Request----> \n: {}",json);
-        return tokenManager.getValidToken(keyId, key,Request_Channel_key)
+        return tokenManager.getValidToken(keyId, key, Request_Channel_key)
                 .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
-                .onErrorResume(ex -> {
-                    // If token expired (403), regenerate and retry once
-                    if (ex.getMessage()!=null && ex.getMessage().contains("403")) {
-                        log.info("Count of Failed messages for WA text Messages: {}",count.getAndIncrement());
-                        log.warn("!Access token might be expired or not authorized, regenerating and retrying...");
-                        return tokenManager.regenerateAccessToken(keyId, key,Request_Channel_key)
+                .timeout(Duration.ofSeconds(5))
+                .doOnError(error->log.info("Request Timed out"))
+                .onErrorResume(ex->{
+                    //Bad request 400
+                    if(ex.getMessage()!=null && ex.getMessage().contains("400")){
+                        log.info(" ! 400 Bad Request There was an error with your request");
+                        return tokenManager.regenerateAccessToken(keyId,key,Request_Channel_key)
+                                .flatMap(newToken->sendMessageWithToken(request,newToken));
+                    }
+                else
+                    // Forbidden Request (403), regenerate and retry once
+                    if (ex.getMessage() != null && ex.getMessage().contains("403")) {
+                        log.info("Count of Failed messages for WA text Messages: {}", count.getAndIncrement());
+                        log.warn(" Forbidden Your request has been received, but access is forbidden. " +
+                                "The RBM bot you are using to send messages has been suspended. " +
+                                "This can happen for various reasons, including outstanding charges. \n regenerating and retrying...");
+                        return tokenManager.regenerateAccessToken(keyId, key, Request_Channel_key)
+                                .flatMap(newToken -> sendMessageWithToken(request, newToken));
+                    }
+                else
+                    //Access Unauthorized 401
+                    if(ex.getMessage()!=null && ex.getMessage().contains("401")){
+                        log.info("! Unauthorized There was an authentication error with your request." +
+                                " Either you're using incorrect token or your user name or password is expired.\n Regenerating and Retrying....");
+                        return tokenManager.regenerateAccessToken(keyId,key,Request_Channel_key)
+                                .flatMap(newToken ->sendMessageWithToken(request,newToken));
+                    }
+                else
+                    // If  DNSNameResolver exception(500) or , regenerate and retry once
+                    if (ex.getMessage() != null && ex.getMessage().contains("500")) {
+                        log.info("Count of Failed messages for WA text Messages: {}", count.getAndIncrement());
+                        log.warn("!Internal Server Error An unexpected error occurred before queueing your message or while your message was being queued" +
+                                "\n Retrying.....");
+                        return tokenManager.regenerateAccessToken(keyId, key, Request_Channel_key)
                                 .flatMap(newToken -> sendMessageWithToken(request, newToken));
                     }
                     return Mono.error(ex); // propagate other errors
                 });
     }
-    public Mono<Map<String, Object>> sendMessageWithToken(WaTextMsgRequest request,String token) {
+
+    public Mono<Map<String, Object>> sendMessageWithToken(WaTextMsgRequest request, String token) {
 
         return webClient.post()
                 .uri("https://api.aclwhatsapp.com/pull-platform-receiver/v2/wa/messages")
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+//                .contentType(MediaType.APPLICATION_JSON_VALUE)
+//                .accept(MediaType.APPLICATION_JSON_VALUE)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .bodyValue(request)
 //                .exchangeToMono(clientResponse -> {
@@ -95,13 +127,13 @@ public class MessageService {
                     if (status.is2xxSuccessful() && MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
                         return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
                                 })
-                                .doOnNext(body->{
-                                        log.info("✅ Message sent successfully. Status: {}, Response: {}", status.value(), body);
-                                    ObjectMapper mapper=new ObjectMapper();
+                                .doOnNext(body -> {
+                                    log.info("✅ Message sent successfully. Status: {}, Response: {}", status.value(), body);
+                                    ObjectMapper mapper = new ObjectMapper();
                                     mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
                                     try {
-                                        String  json=mapper.writeValueAsString(request);
-                                        WAResponses entity=new WAResponses();
+                                        String json = mapper.writeValueAsString(request);
+                                        WAResponses entity = new WAResponses();
                                         entity.setResponseId((String) body.get("responseId"));
                                         entity.setRequestBody(json);
                                         waResponseService.saveToDb(entity);
@@ -110,20 +142,20 @@ public class MessageService {
                                         throw new RuntimeException(e);
                                     }
                                 })
-                                .doOnNext(body-> {
-                                    ObjectMapper mapper=new ObjectMapper();
+                                .doOnNext(body -> {
+                                    ObjectMapper mapper = new ObjectMapper();
                                     mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
                                     try {
-                                        String  json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+                                        String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
                                         String responseId = (String) body.get("responseId");
-                                        log.info("ResponseId: {}",responseId);
-                                        log.info("Saving response and body to redis\n: {}",json);
+                                        log.info("ResponseId: {}", responseId);
+                                        log.info("Saving response and body to redis\n: {}", json);
                                         redisService.save(responseId, json)
                                                 .doOnNext(saved -> log.info("✅ Saved to Redis: {}", saved))
                                                 .doOnError(err -> log.error("❌ Failed to save to Redis", err))
                                                 .subscribe();
                                     } catch (JsonProcessingException e) {
-                                        throw new RuntimeException("unable to save to redis / json parsing exception. ",e);
+                                        throw new RuntimeException("unable to save to redis / json parsing exception. ", e);
                                     }
                                 });
                     } else {
@@ -165,20 +197,20 @@ public class MessageService {
     //-------------------------------------------------------------------------------------------------------
     public Mono<Map<String, Object>> sendMediaRequest(MediaUploadRequest request) throws JsonProcessingException {
 //        log.info("Rcs Template Message Request------>\n,{}",request);
-        ObjectMapper mapper=new ObjectMapper();
+        ObjectMapper mapper = new ObjectMapper();
 
         mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
 
-        String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+        String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
 
 //        log.info("Outgoing RCS Template Message Request----> \n: {}",json);
-        return tokenManager.getValidToken(keyId, key,Request_Channel_key)
+        return tokenManager.getValidToken(keyId, key, Request_Channel_key)
                 .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
                 .onErrorResume(ex -> {
                     // If token expired (403), regenerate and retry once
-                    if (ex.getMessage()!=null && ex.getMessage().contains("403")) {
+                    if (ex.getMessage() != null && ex.getMessage().contains("403")) {
                         log.warn("!Access token might be expired or not authorized, regenerating and retrying...");
-                        return tokenManager.regenerateAccessToken(keyId, key,Request_Channel_key)
+                        return tokenManager.regenerateAccessToken(keyId, key, Request_Channel_key)
                                 .flatMap(newToken -> sendMessageWithToken(request, newToken));
                     }
                     return Mono.error(ex); // propagate other errors
@@ -199,7 +231,8 @@ public class MessageService {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .bodyValue(requestDTO)
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
+                })
                 .flatMap(responseMap -> {
                     log.info("✅ Media Upload Response: {}", responseMap);
 
