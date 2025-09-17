@@ -42,14 +42,14 @@ public class TokenManager {
      * 2. Refresh token if access token missing.
      * 3. Regenerate access token in background if needed.
      */
-    public Mono<String> getValidToken(String keyId, String key,String Request_Channel_key) {
+    public Mono<String> getValidToken(String keyId, String key, String Request_Channel_key) {
         return redisService.get(Request_Channel_key)
                 .map(Object::toString)
                 .switchIfEmpty(
 
                         // Access token not found -->regenerate
-                        regenerateAccessToken(keyId, key,Request_Channel_key).map(Objects::toString)
-                                .doOnNext(refresh->log.info("⚠️ Using newly generated token"))
+                        regenerateAccessToken(keyId, key, Request_Channel_key).map(Objects::toString)
+                                .doOnNext(refresh -> log.info("⚠️ Using newly generated token"))
 //                        Mono.defer(() -> redisService.get("RCS_refresh_token")
 //                                .map(Object::toString)
 //                                .doOnNext(refresh -> log.info("⚠️ Using refresh token temporarily: {}", refresh))
@@ -61,18 +61,23 @@ public class TokenManager {
     /**
      * Regenerates access token immediately and returns it.
      */
-    public Mono<String> regenerateAccessToken(String keyId, String key,String Request_Channel_key) {
+    public Mono<String> regenerateAccessToken(String keyId, String key, String Request_Channel_key) {
         Registration request = new Registration();
         request.setUsername(keyId);
         request.setPassword(key);
-
-        // Save regenerated token to Redis before returning
-        return regenerateTokenService.regenerateToken(request)
-                .flatMap(resp -> {
-                    log.info("✅ Access token regenerated immediately-> Status:: true");
-                    //returning geerated token
-                    return redisService.get(Request_Channel_key).map(Object::toString);
-                })
-                .switchIfEmpty(Mono.error(new RuntimeException("❌ Failed to regenerate access token")));
+        Mono<String> token = redisService.get(Request_Channel_key).map(Object::toString);
+        return token
+                .switchIfEmpty(
+                        // Save regenerated token to Redis before returning
+                        regenerateTokenService.regenerateToken(request)
+                                .flatMap(resp -> {
+                                    log.info("✅ Access token regenerated immediately-> Status:: true");
+                                    //returning geerated token
+                                    return redisService.get(Request_Channel_key).map(Object::toString);
+                                })
+                                .switchIfEmpty(
+                                        Mono.error(new RuntimeException("❌ Failed to regenerate access token"))
+                                )
+                );
     }
 }

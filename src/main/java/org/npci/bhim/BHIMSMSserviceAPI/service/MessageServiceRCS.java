@@ -36,7 +36,7 @@ public class MessageServiceRCS {
     private final RCSResponseService rcsResponseService;
 
 
-    public static final String Request_Channel_key="RCS_access_token";
+    public static final String Request_Channel_key = "RCS_access_token";
     @Value("${npci.rcs.uname}")
     String keyId;
     @Value("${npci.rcs.key}")
@@ -46,18 +46,18 @@ public class MessageServiceRCS {
 //        log.info("Rcs Template Message Request------>\n,{}",request);
 
 
-        ObjectMapper mapper=new ObjectMapper();
+        ObjectMapper mapper = new ObjectMapper();
         mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
-        String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+        String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
 
 //        log.info("Outgoing RCS Template Message Request----> \n: {}",json);
-        return tokenManager.getValidToken(keyId, key,Request_Channel_key)
+        return tokenManager.getValidToken(keyId, key, Request_Channel_key)
                 .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
                 .onErrorResume(ex -> {
                     // If token expired (403), regenerate and retry once
-                    if (ex.getMessage()!=null && ex.getMessage().contains("403")) {
+                    if (ex.getMessage() != null && ex.getMessage().contains("403")) {
                         log.warn("!Access token might be expired or not authorized, regenerating and retrying...");
-                        return tokenManager.regenerateAccessToken(keyId, key,Request_Channel_key)
+                        return tokenManager.regenerateAccessToken(keyId, key, Request_Channel_key)
                                 .flatMap(newToken -> sendMessageWithToken(request, newToken));
                     }
                     return Mono.error(ex); // propagate other errors
@@ -68,34 +68,34 @@ public class MessageServiceRCS {
     public Mono<Map<String, Object>> sendMessage(RCSTextMessageRequest request) throws JsonProcessingException {
 //        log.info("Rcs Text Message Request------>\n,{}",request);
 
-        ObjectMapper mapper=new ObjectMapper();
+        ObjectMapper mapper = new ObjectMapper();
 
         mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
 
-        String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+        String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
 
 //        log.info("Outgoing RCS Text Message Request----> \n: {}",json);
-        return tokenManager.getValidToken(keyId, key,Request_Channel_key)
+        return tokenManager.getValidToken(keyId, key, Request_Channel_key)
                 .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
                 .onErrorResume(ex -> {
                     // If token expired (403), regenerate and retry once
                     if (ex.getMessage().contains("403")) {
                         log.warn("Access token might be expired, regenerating and retrying...");
-                        return tokenManager.regenerateAccessToken(keyId, key,Request_Channel_key)
+                        return tokenManager.regenerateAccessToken(keyId, key, Request_Channel_key)
                                 .flatMap(newToken -> sendMessageWithToken(request, newToken));
                     }
                     return Mono.error(ex); // propagate other errors
                 });
     }
-//--------------------------------------------------------------------------------------------------------------------------
+
+    //--------------------------------------------------------------------------------------------------------------------------
     private Mono<Map<String, Object>> sendMessageWithToken(RCSTemplateMessageRequest request, String token) {
         //log.info("Sending message using access token: {}", token);
 
         String URL_RCS = "https://convapi.aclwhatsapp.com/v1/projects/e3fe594a-90d9-4387-9848-b1ceca763d87/messages:send";
         return webClient.post()
                 .uri(URL_RCS)
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .bodyValue(request)
                 .exchangeToMono(clientResponse -> {
@@ -103,14 +103,15 @@ public class MessageServiceRCS {
                     MediaType contentType = clientResponse.headers().contentType().orElse(MediaType.APPLICATION_OCTET_STREAM);
 
                     if (status.is2xxSuccessful() && MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
-                        return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                                .doOnNext(body->{
-                                        log.info("✅ Message sent successfully. Status: {}", status.value());
-                                            ObjectMapper mapper=new ObjectMapper();
+                        return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
+                                })
+                                .doOnNext(body -> {
+                                            log.info("✅ Message sent successfully. Status: {}", status.value());
+                                            ObjectMapper mapper = new ObjectMapper();
                                             mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
                                             try {
-                                                String  json=mapper.writeValueAsString(request);
-                                                RcsResponses entity=new RcsResponses();
+                                                String json = mapper.writeValueAsString(request);
+                                                RcsResponses entity = new RcsResponses();
                                                 entity.setMessageId((String) body.get("message_id"));
                                                 entity.setRequestBody(json);
                                                 rcsResponseService.saveTODb(entity);
@@ -118,23 +119,23 @@ public class MessageServiceRCS {
                                             } catch (JsonProcessingException e) {
                                                 throw new RuntimeException(e);
                                             }
-                                }
+                                        }
                                 )
-                                .doOnNext(body-> {
-                                    ObjectMapper mapper=new ObjectMapper();
+                                .doOnNext(body -> {
+                                    ObjectMapper mapper = new ObjectMapper();
                                     mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
                                     try {
-                                        String  json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+                                        String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
                                         String messageId = (String) body.get("message_id");
-                                        log.info("MessageID: {}",messageId);
-                                        log.info("Saving response and body to redis\n: {}",json);
+                                        log.info("MessageID: {}", messageId);
+                                        log.info("Saving response and body to redis....");
                                         redisService.save(messageId, request, Duration.ofSeconds(5000))
-                                                .doOnNext(saved -> log.info("✅ Saved to Redis: Status ::TRUE"))
+                                                .doOnNext(saved -> log.info("✅ Saved to Redis "))
                                                 .doOnError(err -> log.error("❌ Failed to save to Redis", err))
                                                 .subscribe();
 
                                     } catch (JsonProcessingException e) {
-                                        throw new RuntimeException("unable to save to redis / json parsing exception. ",e);
+                                        throw new RuntimeException("unable to save to redis / json parsing exception. ", e);
                                     }
                                 });
                     } else if (status.value() == 403) {
@@ -143,13 +144,13 @@ public class MessageServiceRCS {
                                     log.error("❌ 403 Forbidden: {}", body);
                                     return Mono.error(new RuntimeException("403 FORBIDDEN"));
                                 });
-                    }else if(status.value()==401){
+                    } else if (status.value() == 401) {
                         return clientResponse.bodyToMono(String.class)
-                                .flatMap(body->{
-                                    log.error("401 Unauthorized There was an authentication error with your request. Either you're using incorrect token or your user name or password is expired.\n{}",body);
+                                .flatMap(body -> {
+                                    log.error("401 Unauthorized There was an authentication error with your request. Either you're using incorrect token or your user name or password is expired.\n{}", body);
                                     return Mono.error(new AuthenticationException("401 Access Restricted "));
                                 });
-                    }else {
+                    } else {
                         return clientResponse.bodyToMono(String.class)
                                 .flatMap(body -> {
                                     log.error("❌ Message send failed. Status: {}, Body: {}", status.value(), body);
@@ -176,24 +177,38 @@ public class MessageServiceRCS {
                     MediaType contentType = clientResponse.headers().contentType().orElse(MediaType.APPLICATION_OCTET_STREAM);
 
                     if (status.is2xxSuccessful() && MediaType.APPLICATION_JSON.isCompatibleWith(contentType)) {
-                        return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                                .doOnNext(body->
-                                        log.info("✅ Message sent successfully. Status: {}", status.value())
-                                )
-                                .doOnNext(body-> {
-                                    ObjectMapper mapper=new ObjectMapper();
+                        return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
+                                })
+                                .doOnNext(body -> {
+                                    log.info("✅ Message sent successfully. Status: {}", status.value());
+                                    ObjectMapper mapper = new ObjectMapper();
                                     mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
                                     try {
-                                        String  json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+                                        String json = mapper.writeValueAsString(request);
+                                        RcsResponses entity = new RcsResponses();
+                                        entity.setMessageId((String) body.get("message_id"));
+                                        entity.setRequestBody(json);
+                                        rcsResponseService.saveTODb(entity);
+                                        log.info("✅ Saved to DB");
+                                    } catch (JsonProcessingException e) {
+                                        throw new RuntimeException(e);
+                                    }
+
+                                })
+                                .doOnNext(body -> {
+                                    ObjectMapper mapper = new ObjectMapper();
+                                    mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+                                    try {
+                                        String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
                                         String messageId = (String) body.get("message_id");
-                                        log.info("MessageID: {}",messageId);
-                                        log.info("Saving response and body to redis\n: {}",request);
+                                        log.info("MessageID: {}", messageId);
+                                        log.info("Saving response and body to redis....");
                                         redisService.save(messageId, request, Duration.ofSeconds(5000))
-                                                .doOnNext(saved -> log.info("✅ Saved to Redis: {}", saved))
+                                                .doOnNext(saved -> log.info("✅ Saved to Redis"))
                                                 .doOnError(err -> log.error("❌ Failed to save to Redis", err))
                                                 .subscribe();
                                     } catch (JsonProcessingException e) {
-                                        throw new RuntimeException("unable to save to redis / json parsing exception. ",e);
+                                        throw new RuntimeException("unable to save to redis / json parsing exception. ", e);
                                     }
                                 });
                     } else if (status.value() == 403) {

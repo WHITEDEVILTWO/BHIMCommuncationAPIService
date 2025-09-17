@@ -51,14 +51,12 @@ public class RegenerateTokenService {
                     log.info("Http Status code: {}", clientResponse.statusCode().value());
                     return clientResponse.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
                             })
-                            .doOnNext(body ->
-                                    log.info("Response Body :{} ", body))
                             .flatMap(body -> {
 //                                log.info("Response Body: {}", body);
 
                                 //  Extract keys
                                 String accessToken = (String) body.get("access_token");
-                                log.info("Access token is : {}", accessToken);
+//                                log.info("Access token is : {}", accessToken);
                                 String refreshToken = (String) body.get("refresh_token");
                                 Integer expiresIn = (Integer) body.get("expires_in");
                                 Integer refresh_expires_in = (Integer) body.get("refresh_expires_in");
