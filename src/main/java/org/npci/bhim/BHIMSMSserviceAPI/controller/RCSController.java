@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.npci.bhim.BHIMSMSserviceAPI.piiDataManagement.DataEncLayer;
 import org.npci.bhim.BHIMSMSserviceAPI.rcsMessageRequests.RCSTemplateMessageRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.rcsMessageRequests.RCSTextMessageRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.service.AuthenticateService;
@@ -24,11 +25,11 @@ import java.util.Map;
 public class RCSController {
 
     private final MessageServiceRCS messageServiceRCS;
-
+    private final DataEncLayer dataEncLayer;
     private final AuthenticateService authenticateService;
 
     @PostMapping("/sendRCSTextMessage")
-    public Mono<Map<String,Object>> sendMessage(@RequestBody RCSTextMessageRequest request) throws JsonProcessingException {
+    public Mono<Map<String,Object>> sendMessage(@RequestBody RCSTextMessageRequest request) throws Exception {
 //        log.info("Controller --->Sending RCS text Message to Service........");
         ObjectMapper mapper=new ObjectMapper();
 
@@ -37,21 +38,13 @@ public class RCSController {
         String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
 
 //        log.info("Contoller-->Outgoing RCS Text Message Request to service layer----> \n: {}",json);
-        return messageServiceRCS.sendMessage(request);
+        return dataEncLayer.routeToService(request);
 
     }
     @PostMapping("/sendRCSTemplateMessage")
-    public Mono<Map<String,Object>> sendMessage(@RequestBody RCSTemplateMessageRequest request) throws JsonProcessingException {
+    public Mono<Map<String,Object>> sendMessage(@RequestBody RCSTemplateMessageRequest request) throws Exception {
 
-        ObjectMapper mapper=new ObjectMapper();
-
-        mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
-
-        String json=mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
-
-//        log.info("Contoller-->Outgoing RCS Template Message Request----> \n: {}",json);
-
-        return messageServiceRCS.sendMessage(request);
+        return dataEncLayer.routeToService(request);
 
     }
 }

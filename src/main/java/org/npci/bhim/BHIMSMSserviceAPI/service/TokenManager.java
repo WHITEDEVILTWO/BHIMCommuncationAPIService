@@ -3,6 +3,7 @@ package org.npci.bhim.BHIMSMSserviceAPI.service;
 import lombok.extern.slf4j.Slf4j;
 import org.npci.bhim.BHIMSMSserviceAPI.model.Registration;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;

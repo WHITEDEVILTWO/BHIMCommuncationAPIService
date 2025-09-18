@@ -49,8 +49,8 @@ public class MessageServiceRCS {
         ObjectMapper mapper = new ObjectMapper();
         mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
         String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+        log.info("Enc_Outgoing RCS Template Message Request----> \n: {}",json);
 
-//        log.info("Outgoing RCS Template Message Request----> \n: {}",json);
         return tokenManager.getValidToken(keyId, key, Request_Channel_key)
                 .flatMap(accessToken -> sendMessageWithToken(request, accessToken))
                 .onErrorResume(ex -> {

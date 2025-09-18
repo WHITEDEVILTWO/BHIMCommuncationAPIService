@@ -7,10 +7,12 @@ import lombok.NonNull;
 import org.npci.bhim.BHIMSMSserviceAPI.convAPIConstants.ConvAPIConstants;
 import org.npci.bhim.BHIMSMSserviceAPI.modelRCS.IdentifiedBy;
 import org.npci.bhim.BHIMSMSserviceAPI.modelRCS.Message;
+import org.npci.bhim.BHIMSMSserviceAPI.piiDataManagement.EncryptablePayload;
 
 @Data
 @NoArgsConstructor
 @JsonInclude(value = JsonInclude.Include.NON_NULL)
+@EncryptablePayload
 public class RCSTemplateMessageRequest {
     private String app_id= ConvAPIConstants.Conv_app_id;
     @NonNull

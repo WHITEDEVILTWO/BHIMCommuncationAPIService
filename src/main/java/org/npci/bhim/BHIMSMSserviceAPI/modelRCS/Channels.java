@@ -4,19 +4,18 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
-import org.springframework.validation.beanvalidation.MethodValidationAdapter;
 
 import java.util.Objects;
 
 @Data
-@NonNull
-@NoArgsConstructor@AllArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 public class Channels {
 
     @NonNull
     private String channel;
     @NonNull
-    private String identity;
+    private String identity; //moble number
 
     public void setIdentity(String identity) {
         this.identity = validateMobileNumber(identity);

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.npci.bhim.BHIMSMSserviceAPI.piiDataManagement.DataEncLayer;
 import org.npci.bhim.BHIMSMSserviceAPI.responseDTO.WAResponses;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.MediaUploadRequest;
 import org.npci.bhim.BHIMSMSserviceAPI.messageRequests.WaTextMsgRequest;
@@ -30,14 +31,16 @@ public class controller {
     private final MessageService messageService;
     private final RedisService redisService;
     private final WAResponseRepository waResponseRepository;
+    private final DataEncLayer dataEncLayer;
     @Autowired
     private ObjectMapper objectMapper;
 
-    public controller(AuthenticateService authenticateService, MessageService messageService, RedisService redisService, WAResponseRepository waResponseRepository) {
+    public controller(AuthenticateService authenticateService, MessageService messageService, RedisService redisService, WAResponseRepository waResponseRepository, DataEncLayer dataEncLayer) {
         this.authenticateService = authenticateService;
         this.messageService = messageService;
         this.redisService = redisService;
         this.waResponseRepository = waResponseRepository;
+        this.dataEncLayer = dataEncLayer;
     }
 
     @PostConstruct
@@ -45,49 +48,19 @@ public class controller {
         objectMapper.getRegisteredModuleIds().forEach(id -> System.out.println("Registered module: " + id));
     }
 
-
-    @PostMapping("/redissavetest")
-    public void savetoredistest(){
-        redisService.save("Ganesh","BABU");
-        WAResponses responses=new WAResponses();
-        responses.setResponseId("123456789");
-        responses.setRequestBody("{\n" +
-                "  \"recipient_type\" : \"individual\",\n" +
-                "  \"to\" : \"917893411160\",\n" +
-                "  \"type\" : \"template\",\n" +
-                "  \"template\" : {\n" +
-                "    \"name\" : \"p2p_cohort_19082025\",\n" +
-                "    \"language\" : {\n" +
-                "      \"policy\" : \"deterministic\",\n" +
-                "      \"code\" : \"en\"\n" +
-                "    },\n" +
-                "    \"components\" : null\n" +
-                "  },\n" +
-                "  \"metadata\" : {\n" +
-                "    \"messageId\" : \"8d3fe6f3-21fc-4130-9c29-5a7be3799340\",\n" +
-                "    \"transactionId\" : \"a5da78ac-01b5-4fec-b3eb-0e1402f8f577\",\n" +
-                "    \"callbackDlrUrl\" : \"https://bhimupi.com\"\n" +
-                "  }\n" +
-                "}");
-        waResponseRepository.save(responses);
-        log.info("Saved to db");
-
-    }
-    @PostMapping("/getToken")
-    public Mono<ResponseEntity<Map<String,Object>>> getToken(@ModelAttribute Registration request) throws JsonProcessingException {
-        ObjectMapper mapper=new ObjectMapper();
-//        System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
-//        Object accessToken = redisService.get("WA_access_token").block();
-//        log.info("Access Token from controller : {} ",accessToken);
-        return authenticateService.sendRegRequest(request);
-    }
+    //@Deprecated
+//    @PostMapping("/getToken")
+//    public Mono<ResponseEntity<Map<String,Object>>> getToken(@ModelAttribute Registration request) throws JsonProcessingException {
+//        ObjectMapper mapper=new ObjectMapper();
+////        System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
+////        Object accessToken = redisService.get("WA_access_token").block();
+////        log.info("Access Token from controller : {} ",accessToken);
+//        return authenticateService.sendRegRequest(request);
+//    }
     @PostMapping("/sendmessage")
-    public Mono<Map<String, Object>> sedMessage(@RequestBody WaTextMsgRequest request) throws JsonProcessingException {
+    public Mono<Map<String, Object>> sedMessage(@RequestBody WaTextMsgRequest request) throws Exception {
 
-        ObjectMapper mapper=new ObjectMapper();
-        System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request));
-
-        return messageService.sendMessage(request);
+        return dataEncLayer.routeToService(request);
     }
 /**
     @PostMapping("/optin")

@@ -25,9 +25,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 @Service
 @RequiredArgsConstructor
@@ -36,8 +36,8 @@ public class MessageService {
 
     private final WebClient webClient;
     private final RedisService redisService;
-
     private final TokenManager tokenManager;
+
 
     public static final String REQUEST_CHANNEL_KEY = "WA_access_token";
 
@@ -49,64 +49,23 @@ public class MessageService {
     @Value("${npci.wa.key}")
     String key;
 
+
+
 //    private final MediaResponseRepository mediaResponseRepository;
 
     private static final int MAX_RETRIES = 3;
 
     public Mono<Map<String, Object>> sendMessage(WaTextMsgRequest request) throws JsonProcessingException {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.setSerializationInclusion((JsonInclude.Include.NON_NULL));
+        String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(request);
+        log.info("Enc_Outgoing WA text template Message Request----> \n: {}",json);
         return tokenManager.getValidToken(keyId, key, REQUEST_CHANNEL_KEY)
                 .flatMap(token -> sendMessageWithToken(request, token))
                 .timeout(Duration.ofSeconds(5)) // base timeout
                 .doOnError(error -> log.error("⏳ Request timed out: {}", error.getMessage()))
                 .onErrorResume(ex -> handleError(request, ex));
     }
-
-    private Mono<Map<String, Object>> handleError(WaTextMsgRequest request, Throwable ex) {
-        if (ex.getMessage() == null) return Mono.error(ex);
-
-        if (ex instanceof java.util.concurrent.TimeoutException) {
-            return retryWithCustomTimeout(request, Duration.ofSeconds(5), "Timeout occurred → retrying...");
-        }
-        if (ex.getMessage().contains("400")) {
-            return retryOnBadRequest(request);
-        }
-        if (ex.getMessage().contains("401")) {
-            return retryOnAuthFailure(request);
-        }
-        if (ex.getMessage().contains("403")) {
-            return retryOnForbidden(request);
-        }
-        if (ex.getMessage().contains("500")) {
-            return retryOnServerError(request);
-        }
-        return Mono.error(ex); // propagate unhandled errors
-    }
-
-    // 🔹 Retry methods with different timeouts
-    private Mono<Map<String, Object>> retryOnBadRequest(WaTextMsgRequest request) {
-        return retryWithCustomTimeout(request, Duration.ofSeconds(3), "400 Bad Request → Retrying...");
-    }
-
-    private Mono<Map<String, Object>> retryOnAuthFailure(WaTextMsgRequest request) {
-        return retryWithCustomTimeout(request, Duration.ofSeconds(5), "401 Unauthorized → Retrying after token refresh...");
-    }
-
-    private Mono<Map<String, Object>> retryOnForbidden(WaTextMsgRequest request) {
-        return retryWithCustomTimeout(request, Duration.ofSeconds(5), "403 Forbidden → Retrying with new token...");
-    }
-
-    private Mono<Map<String, Object>> retryOnServerError(WaTextMsgRequest request) {
-        return retryWithCustomTimeout(request, Duration.ofSeconds(30), "500 Internal Server Error → Retrying...");
-    }
-
-    private Mono<Map<String, Object>> retryWithCustomTimeout(WaTextMsgRequest request, Duration timeout, String logMsg) {
-        log.warn(logMsg);
-        return tokenManager.regenerateAccessToken(keyId, key,REQUEST_CHANNEL_KEY)
-                .flatMap(newToken -> sendMessageWithToken(request, newToken))
-                .timeout(timeout)
-                .retry(MAX_RETRIES);
-    }
-
     // 🔹 Existing method to send WA message
     public Mono<Map<String, Object>> sendMessageWithToken(WaTextMsgRequest request, String token) {
         return webClient.post()
@@ -156,6 +115,51 @@ public class MessageService {
         } catch (JsonProcessingException e) {
             log.error("❌ Failed saving response", e);
         }
+    }
+    private Mono<Map<String, Object>> handleError(WaTextMsgRequest request, Throwable ex) {
+        if (ex.getMessage() == null) return Mono.error(ex);
+
+        if (ex instanceof TimeoutException) {
+            return retryWithCustomTimeout(request, Duration.ofSeconds(5), "Timeout occurred → retrying...");
+        }
+        if (ex.getMessage().contains("400")) {
+            return retryOnBadRequest(request);
+        }
+        if (ex.getMessage().contains("401")) {
+            return retryOnAuthFailure(request);
+        }
+        if (ex.getMessage().contains("403")) {
+            return retryOnForbidden(request);
+        }
+        if (ex.getMessage().contains("500")) {
+            return retryOnServerError(request);
+        }
+        return Mono.error(ex); // propagate unhandled errors
+    }
+
+    // 🔹 Retry methods with different timeouts
+    private Mono<Map<String, Object>> retryOnBadRequest(WaTextMsgRequest request) {
+        return retryWithCustomTimeout(request, Duration.ofSeconds(3), "400 Bad Request → Reverted ...");
+    }
+
+    private Mono<Map<String, Object>> retryOnAuthFailure(WaTextMsgRequest request) {
+        return retryWithCustomTimeout(request, Duration.ofSeconds(5), "401 Unauthorized → Retrying after token refresh...");
+    }
+
+    private Mono<Map<String, Object>> retryOnForbidden(WaTextMsgRequest request) {
+        return retryWithCustomTimeout(request, Duration.ofSeconds(5), "403 Forbidden → Retrying with new token...");
+    }
+
+    private Mono<Map<String, Object>> retryOnServerError(WaTextMsgRequest request) {
+        return retryWithCustomTimeout(request, Duration.ofSeconds(30), "500 Internal Server Error → Retrying...");
+    }
+
+    private Mono<Map<String, Object>> retryWithCustomTimeout(WaTextMsgRequest request, Duration timeout, String logMsg) {
+        log.warn(logMsg);
+        return tokenManager.regenerateAccessToken(keyId, key,REQUEST_CHANNEL_KEY)
+                .flatMap(newToken -> sendMessageWithToken(request, newToken))
+                .timeout(timeout)
+                .retry(MAX_RETRIES);
     }
 
 //    public MediaUploadResponse uploadMedia(String requestUrl) {
